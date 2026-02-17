@@ -1,0 +1,225 @@
+﻿<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rentium - Simulateur locatif</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <header class="app-header">
+    <h1>Rentium</h1>
+    <p>Simulateur de rentabilite locative - Version Essentiel</p>
+    <div class="mode-switch">
+      <label for="planSelect">Plan</label>
+      <select id="planSelect">
+        <option value="free">Gratuit</option>
+        <option value="essential">Essentiel (29 EUR)</option>
+        <option value="pro">Pro (59 EUR)</option>
+      </select>
+      <button id="openPricingBtn" type="button" class="ghost-btn">Voir les plans</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card form-card">
+      <h2>Parametres du bien</h2>
+      <form id="simulatorForm" class="grid-form">
+        <label>Prix d'achat<input name="purchasePrice" type="number" min="0" step="1000" value="200000" required></label>
+        <label>Frais de notaire<input name="notaryFees" type="number" min="0" step="100" value="16000" required></label>
+        <label>Travaux & ameublement<input name="works" type="number" min="0" step="100" value="12000" required></label>
+        <label>Apport initial<input name="downPayment" type="number" min="0" step="100" value="20000" required></label>
+        <label>Taux du credit (%)<input name="interestRate" type="number" min="0" step="0.01" value="3.9" required></label>
+        <label>Duree du credit (ans)<input name="loanYears" type="number" min="1" step="1" value="20" required></label>
+        <label>Assurance annuelle (%)<input name="insuranceRate" type="number" min="0" step="0.01" value="0.34" required></label>
+        <label>Loyer mensuel<input name="monthlyRent" type="number" min="0" step="10" value="980" required></label>
+        <label>Vacance locative (%)<input name="vacancyRate" type="number" min="0" max="100" step="0.1" value="5" required></label>
+        <label>Charges non recuperables / mois<input name="monthlyCharges" type="number" min="0" step="10" value="95" required></label>
+        <label>Taxe fonciere annuelle<input name="propertyTax" type="number" min="0" step="10" value="1200" required></label>
+        <label>Gestion locative (%)<input name="managementRate" type="number" min="0" max="100" step="0.1" value="7" required></label>
+        <label>Entretien annuel<input name="annualMaintenance" type="number" min="0" step="10" value="900" required></label>
+      </form>
+
+      <div class="actions">
+        <button id="prefillRatesBtn" type="button">Pre-remplir taux 2026</button>
+        <button id="copyLinkBtn" type="button">Copier lien</button>
+        <button id="saveScenarioBtn" type="button">Sauvegarder scenario</button>
+        <button id="exportPdfBtn" type="button" data-premium="true">Export PDF</button>
+      </div>
+      <small id="statusText" class="status"></small>
+    </section>
+
+    <section class="card results-card" id="printArea">
+      <h2>Resultats instantanes</h2>
+      <div class="metrics" id="metrics"></div>
+      <div class="cashflow-banner" id="cashflowBanner"></div>
+      <div class="error-box" id="errorBox"></div>
+      <section id="proPrintReport" class="pro-print-report" aria-label="Rapport Pro PDF"></section>
+    </section>
+
+    <section class="card scenarios-card">
+      <div class="section-head">
+        <h2>Scenarios sauvegardes</h2>
+        <button id="compareBtn" type="button" data-premium="true">Comparer (2-3)</button>
+      </div>
+      <div id="scenariosList" class="scenarios-list"></div>
+      <div id="comparisonArea" class="comparison-area"></div>
+    </section>
+
+    <section class="card upgrade-card">
+      <h2>Optimise ton investissement</h2>
+      <p id="upgradeMessage" class="upgrade-message"></p>
+      <button id="upgradeCtaBtn" type="button">Decouvrir le plan superieur</button>
+    </section>
+
+    <section class="card pro-card" id="proCard" hidden>
+      <div class="section-head">
+        <h2>Analyse avancee</h2>
+        <span class="pro-badge">Pro 59 EUR</span>
+      </div>
+
+      <div class="pro-inputs">
+        <label>Regime fiscal
+          <select id="taxMode">
+            <option value="micro">Micro-BIC (abattement 50%)</option>
+            <option value="real">Reel simplifie</option>
+            <option value="bare">Location vide</option>
+          </select>
+        </label>
+        <label>TMI utilisateur
+          <select id="marginalTaxRate">
+            <option value="unknown">Je ne sais pas</option>
+            <option value="0">0%</option>
+            <option value="11">11%</option>
+            <option value="30" selected>30%</option>
+            <option value="41">41%</option>
+            <option value="45">45%</option>
+          </select>
+        </label>
+        <label>Prelevements sociaux (%)<input id="socialTaxRate" type="number" min="0" max="30" step="0.1" value="17.2"></label>
+        <label>Amortissement annuel (EUR)<input id="annualDepreciation" type="number" min="0" step="100" value="5000"></label>
+        <label>Horizon
+          <select id="projectionYears">
+            <option value="10">10 ans</option>
+            <option value="15">15 ans</option>
+            <option value="20" selected>20 ans</option>
+          </select>
+        </label>
+        <label>Croissance loyer annuelle (%)<input id="annualRentGrowth" type="number" min="-5" max="15" step="0.1" value="1.5"></label>
+        <label>Croissance charges annuelle (%)<input id="annualChargeGrowth" type="number" min="-5" max="15" step="0.1" value="2"></label>
+        <label>Valorisation bien annuelle (%)<input id="annualPropertyGrowth" type="number" min="-10" max="15" step="0.1" value="1.2"></label>
+        <label>Frais de revente (%)<input id="exitCostRate" type="number" min="0" max="20" step="0.1" value="6"></label>
+      </div>
+
+      <nav class="pro-tabs" aria-label="Menu Analyse avancee">
+        <button type="button" class="pro-tab active" data-tab="tax">Fiscalite</button>
+        <button type="button" class="pro-tab" data-tab="projection">Projection long terme</button>
+        <button type="button" class="pro-tab" data-tab="compare">Comparateur de scenarios</button>
+        <button type="button" class="pro-tab" data-tab="chart">Visualisation graphique des flux</button>
+        <button type="button" class="pro-tab" data-tab="score">Score & recommandations</button>
+      </nav>
+
+      <section class="pro-pane active" id="proPaneTax"></section>
+      <section class="pro-pane" id="proPaneProjection"></section>
+      <section class="pro-pane" id="proPaneCompare"></section>
+      <section class="pro-pane" id="proPaneChart">
+        <div class="chart-controls">
+          <label><input class="chart-series-toggle" type="checkbox" value="annualNet" checked> Cashflow net annuel</label>
+          <label><input class="chart-series-toggle" type="checkbox" value="cumulativeNet" checked> Cashflow net cumule</label>
+          <label><input class="chart-series-toggle" type="checkbox" value="netSaleValue" checked> Valeur nette revente</label>
+          <label><input class="chart-series-toggle" type="checkbox" value="totalWithExit" checked> Total theorique avec sortie</label>
+        </div>
+        <canvas id="proChart" width="880" height="280"></canvas>
+        <p id="chartFocus" class="pro-hint">Survole le graphique pour voir le detail par annee.</p>
+      </section>
+      <section class="pro-pane" id="proPaneScore"></section>
+    </section>
+
+    <section class="card legal-card">
+      <h2>Mentions legales et limites</h2>
+      <p class="legal-intro">
+        Estimation informative uniquement. La decision finale doit etre validee avec un professionnel.
+      </p>
+      <details class="legal-details">
+        <summary>Afficher le detail des mentions et hypotheses</summary>
+        <ul class="legal-list">
+          <li>Ce simulateur ne constitue pas un conseil financier, fiscal ou juridique.</li>
+          <li>Les resultats dependent des donnees saisies et d'hypotheses simplifiees.</li>
+          <li>Des ecarts peuvent exister avec la realite (banque, fiscalite, vacance, impayes, travaux).</li>
+          <li>Avant investissement, fais confirmer le dossier par un professionnel qualifie.</li>
+        </ul>
+        <p class="legal-note">
+          La marge d'erreur estimee affichee est une fourchette prudent/optimiste selon loyer, vacance,
+          charges, entretien et gestion locative.
+        </p>
+      </details>
+    </section>
+  </main>
+
+  <template id="metricTemplate">
+    <article class="metric">
+      <h3></h3>
+      <p></p>
+    </article>
+  </template>
+
+  <div id="pricingModal" class="pricing-modal" hidden>
+    <div class="pricing-backdrop" data-close-pricing="true"></div>
+    <section class="pricing-dialog card" role="dialog" aria-modal="true" aria-label="Plans Rentium">
+      <div class="section-head">
+        <h2>Choisis ton plan</h2>
+        <button id="closePricingBtn" type="button" class="ghost-btn">Fermer</button>
+      </div>
+      <p class="pricing-intro">Debloque les outils adaptes a ton niveau d'investissement.</p>
+      <div class="pricing-grid">
+        <article class="plan-card">
+          <h3>Gratuit</h3>
+          <p class="plan-price">0 EUR</p>
+          <ul>
+            <li>Simulation instantanee</li>
+            <li>Resultats de base (rendement, cashflow)</li>
+            <li>Interface simple</li>
+          </ul>
+          <button type="button" data-select-plan="free">Activer Gratuit</button>
+        </article>
+        <article class="plan-card highlighted">
+          <h3>Essentiel</h3>
+          <p class="plan-price">29 EUR</p>
+          <ul>
+            <li>Export PDF standard</li>
+            <li>Sauvegarde illimitee des scenarios</li>
+            <li>Comparaison 2-3 biens</li>
+            <li>Lien de partage</li>
+          </ul>
+          <button type="button" data-select-plan="essential">Choisir Essentiel</button>
+        </article>
+        <article class="plan-card">
+          <h3>Pro</h3>
+          <p class="plan-price">59 EUR</p>
+          <ul>
+            <li>Fiscalite avancee</li>
+            <li>Projection long terme</li>
+            <li>Comparateur avance</li>
+            <li>Graphique des flux + PDF Pro complet</li>
+            <li>Rentium Score sur 100</li>
+            <li>Top recommandations avec impact en EUR/mois</li>
+            <li>Diagnostic risque: respire / limite / risque</li>
+          </ul>
+          <button type="button" data-select-plan="pro">Choisir Pro</button>
+        </article>
+      </div>
+      <p class="pricing-note">
+        En production, branche ici Stripe ou LemonSqueezy pour un paiement reel.
+        Une page dediee est aussi disponible: <a href="payment.html">payment.html</a>.
+      </p>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+﻿<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rentium - Paiement des plans</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Paiement Rentium</h1>
+    <p>Choisis le plan adapte a ton niveau d'investissement locatif</p>
+  </header>
+
+  <main class="layout">
+    <section class="card pro-card" style="grid-column: 1 / -1;">
+      <h2>Plans disponibles</h2>
+      <div class="pricing-grid">
+        <article class="plan-card">
+          <h3>Gratuit</h3>
+          <p class="plan-price">0 EUR</p>
+          <ul>
+            <li>Simulation instantanee</li>
+            <li>Indicateurs essentiels</li>
+            <li>Ideal pour decouvrir le produit</li>
+          </ul>
+        </article>
+
+        <article class="plan-card highlighted">
+          <h3>Essentiel</h3>
+          <p class="plan-price">29 EUR - paiement unique</p>
+          <ul>
+            <li>Export PDF standard</li>
+            <li>Sauvegarde illimitee des scenarios</li>
+            <li>Comparaison 2-3 biens</li>
+            <li>Partage de simulation par lien</li>
+          </ul>
+        </article>
+
+        <article class="plan-card">
+          <h3>Pro</h3>
+          <p class="plan-price">59 EUR - paiement unique</p>
+          <ul>
+            <li>Fiscalite avancee (Micro-BIC / Reel)</li>
+            <li>Projection long terme complete</li>
+            <li>Comparateur avance multi-criteres</li>
+            <li>Graphique des flux + rapport PDF Pro</li>
+            <li>Rentium Score sur 100 + breakdown des sous-scores</li>
+            <li>Top recommandations avec impact estime en EUR/mois</li>
+            <li>Diagnostic de risque (respire / limite / risque)</li>
+          </ul>
+        </article>
+      </div>
+
+      <p class="pricing-note" style="margin-top: 12px;">
+        Etape suivante: connecter un prestataire de paiement (Stripe, LemonSqueezy) et rediriger les boutons "Choisir" vers checkout.
+      </p>
+
+      <p><a href="index.html">Retour au simulateur</a></p>
+    </section>
+  </main>
+</body>
+</html>
