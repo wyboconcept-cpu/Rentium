@@ -18,6 +18,12 @@ const upgradeCtaBtn = document.getElementById('upgradeCtaBtn');
 const openPricingBtn = document.getElementById('openPricingBtn');
 const pricingModal = document.getElementById('pricingModal');
 const closePricingBtn = document.getElementById('closePricingBtn');
+const authEmailInput = document.getElementById('authEmail');
+const authPasswordInput = document.getElementById('authPassword');
+const registerBtn = document.getElementById('registerBtn');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const authState = document.getElementById('authState');
 
 const proCard = document.getElementById('proCard');
 const proPaneTax = document.getElementById('proPaneTax');
@@ -41,7 +47,7 @@ const annualPropertyGrowth = document.getElementById('annualPropertyGrowth');
 const exitCostRate = document.getElementById('exitCostRate');
 
 const STORAGE_KEY = 'rentium_scenarios_v1';
-const CUSTOMER_REF_KEY = 'rentium_customer_ref_v1';
+const AUTH_TOKEN_KEY = 'rentium_auth_token_v1';
 const metricConfig = [
   ['loanAmount', 'Emprunt estime'],
   ['monthlyPayment', 'Mensualite credit (hors assurance)'],
@@ -57,6 +63,9 @@ let lastProAnalysis = null;
 let lastChartRows = [];
 let chartHoverIndex = null;
 let chartLayout = null;
+let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
+let currentUser = null;
+let scenariosCache = readLocalScenarios();
 
 bootstrap();
 
@@ -98,6 +107,9 @@ function init() {
   if (openPricingBtn) openPricingBtn.addEventListener('click', openPricingModal);
   if (closePricingBtn) closePricingBtn.addEventListener('click', closePricingModal);
   if (pricingModal) pricingModal.addEventListener('click', onPricingModalClick);
+  if (registerBtn) registerBtn.addEventListener('click', registerAccount);
+  if (loginBtn) loginBtn.addEventListener('click', loginAccount);
+  if (logoutBtn) logoutBtn.addEventListener('click', logoutAccount);
 
   [
     taxMode, marginalTaxRate, socialTaxRate, annualDepreciation, projectionYears,
@@ -128,7 +140,7 @@ function init() {
   updatePremiumState();
   renderScenarios();
   computeAndRender();
-  syncPlanFromServer();
+  syncAuthState();
 }
 
 function readInputs() {
@@ -879,6 +891,10 @@ function deleteScenario(id) {
 }
 
 function saveScenario() {
+  if (!authToken) {
+    setStatus('Connecte-toi pour sauvegarder des scenarios dans ton compte.');
+    return;
+  }
   if (!isPremiumPlan()) {
     setStatus('Sauvegarde illimitee disponible en plan Essentiel ou Pro.');
     return;
@@ -1013,6 +1029,11 @@ function selectPlanFromModal(plan) {
     return;
   }
 
+  if (!authToken) {
+    setStatus('Connecte-toi d abord (email + mot de passe) pour acheter un plan.');
+    return;
+  }
+
   startStripeCheckout(plan);
 }
 
@@ -1041,25 +1062,21 @@ function setStatus(message) {
   statusText.textContent = message;
 }
 
-function getCustomerRef() {
-  let ref = localStorage.getItem(CUSTOMER_REF_KEY);
-  if (!ref) {
-    ref = crypto.randomUUID();
-    localStorage.setItem(CUSTOMER_REF_KEY, ref);
-  }
-  return ref;
-}
-
 async function startStripeCheckout(plan) {
   try {
+    if (!authToken) {
+      setStatus('Connecte-toi avant de lancer le paiement.');
+      return;
+    }
+
     setStatus('Redirection vers paiement securise Stripe...');
     const response = await fetch('/api/create-checkout-session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        plan,
-        customerRef: getCustomerRef()
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ plan })
     });
 
     if (!response.ok) {
@@ -1077,12 +1094,21 @@ async function startStripeCheckout(plan) {
 
 async function syncPlanFromServer() {
   try {
-    const response = await fetch(`/api/me/plan?customerRef=${encodeURIComponent(getCustomerRef())}`);
-    if (!response.ok) return;
-    const data = await response.json();
+    if (!authToken) {
+      planSelect.value = 'free';
+      updatePremiumState();
+      computeAndRender();
+      return;
+    }
+
+    const data = await apiFetch('/api/me/plan', { method: 'GET' });
     if (!data || !['free', 'essential', 'pro'].includes(data.plan)) return;
 
     planSelect.value = data.plan;
+    if (currentUser) {
+      currentUser = { ...currentUser, plan: data.plan };
+      setAuthUI();
+    }
     updatePremiumState();
     computeAndRender();
   } catch {
@@ -1103,7 +1129,7 @@ function handleCheckoutStatusFromQuery() {
   }
 }
 
-function getScenarios() {
+function readLocalScenarios() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   } catch {
@@ -1111,8 +1137,175 @@ function getScenarios() {
   }
 }
 
-function setScenarios(scenarios) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(scenarios));
+function getScenarios() {
+  return scenariosCache;
+}
+
+function setScenarios(scenarios, options = {}) {
+  const { skipServerSync = false } = options;
+  scenariosCache = Array.isArray(scenarios) ? scenarios : [];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(scenariosCache));
+  if (!skipServerSync) saveScenariosToServer();
+}
+
+async function saveScenariosToServer() {
+  if (!authToken) return;
+  try {
+    await apiFetch('/api/me/scenarios', {
+      method: 'PUT',
+      body: JSON.stringify({ scenarios: scenariosCache })
+    });
+  } catch {
+    setStatus('Sauvegarde cloud indisponible, scenarios conserves localement.');
+  }
+}
+
+async function loadScenariosFromServer() {
+  if (!authToken) return;
+  try {
+    const data = await apiFetch('/api/me/scenarios', { method: 'GET' });
+    if (!data || !Array.isArray(data.scenarios)) return;
+    if (!data.scenarios.length && scenariosCache.length) {
+      await saveScenariosToServer();
+      return;
+    }
+    setScenarios(data.scenarios, { skipServerSync: true });
+    renderScenarios();
+  } catch {
+    // fallback local
+  }
+}
+
+async function registerAccount() {
+  const email = String(authEmailInput?.value || '').trim().toLowerCase();
+  const password = String(authPasswordInput?.value || '');
+  if (!email || !password) {
+    setStatus('Renseigne email et mot de passe.');
+    return;
+  }
+
+  try {
+    const data = await apiFetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      includeAuth: false
+    });
+    authToken = data.token || '';
+    if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+    currentUser = data.user || null;
+    setAuthUI();
+    await loadScenariosFromServer();
+    await syncPlanFromServer();
+    setStatus('Compte cree et connecte.');
+  } catch (error) {
+    setStatus(error.message || 'Impossible de creer le compte.');
+  }
+}
+
+async function loginAccount() {
+  const email = String(authEmailInput?.value || '').trim().toLowerCase();
+  const password = String(authPasswordInput?.value || '');
+  if (!email || !password) {
+    setStatus('Renseigne email et mot de passe.');
+    return;
+  }
+
+  try {
+    const data = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      includeAuth: false
+    });
+    authToken = data.token || '';
+    if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+    currentUser = data.user || null;
+    setAuthUI();
+    await loadScenariosFromServer();
+    await syncPlanFromServer();
+    setStatus('Connexion reussie.');
+  } catch (error) {
+    setStatus(error.message || 'Connexion impossible.');
+  }
+}
+
+async function logoutAccount() {
+  try {
+    if (authToken) {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    }
+  } catch {
+    // ignore logout network errors
+  }
+
+  authToken = '';
+  currentUser = null;
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  setAuthUI();
+  await syncPlanFromServer();
+  setStatus('Deconnecte.');
+}
+
+async function syncAuthState() {
+  if (!authToken) {
+    setAuthUI();
+    return;
+  }
+
+  try {
+    const data = await apiFetch('/api/auth/me', { method: 'GET' });
+    currentUser = data.user || null;
+    setAuthUI();
+    await loadScenariosFromServer();
+    await syncPlanFromServer();
+  } catch {
+    authToken = '';
+    currentUser = null;
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    setAuthUI();
+  }
+}
+
+function setAuthUI() {
+  const connected = Boolean(currentUser && authToken);
+  if (authState) {
+    authState.textContent = connected
+      ? `Connecte: ${currentUser.email} (${currentUser.plan || 'free'})`
+      : 'Non connecte';
+  }
+  if (logoutBtn) logoutBtn.hidden = !connected;
+  if (loginBtn) loginBtn.hidden = connected;
+  if (registerBtn) registerBtn.hidden = connected;
+  if (authEmailInput) authEmailInput.disabled = connected;
+  if (authPasswordInput) authPasswordInput.disabled = connected;
+}
+
+async function apiFetch(url, options = {}) {
+  const {
+    includeAuth = true,
+    headers = {},
+    ...rest
+  } = options;
+
+  const nextHeaders = { ...headers };
+  if (includeAuth && authToken) nextHeaders.Authorization = `Bearer ${authToken}`;
+
+  const response = await fetch(url, { ...rest, headers: nextHeaders });
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const message = payload?.error || text || 'Erreur API';
+    throw new Error(message);
+  }
+
+  return payload;
 }
 
 function generateLoanSchedule(loanAmount, interestRate, loanYears, monthlyPayment) {

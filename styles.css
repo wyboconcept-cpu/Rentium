@@ -76,6 +76,23 @@ body {
   gap: 8px;
 }
 
+.auth-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.auth-bar input {
+  width: auto;
+  min-width: 180px;
+}
+
+.auth-state {
+  color: var(--muted);
+}
+
 .mode-switch select {
   width: auto;
   min-width: 180px;
@@ -656,6 +673,11 @@ body.modal-open {
     grid-template-columns: 1fr;
   }
 
+  .auth-bar input {
+    width: 100%;
+    min-width: 0;
+  }
+
   .pro-inputs,
   .pro-metrics,
   .pro-summary-grid,
@@ -683,7 +705,8 @@ body.modal-open {
   .upgrade-card,
   .pro-card,
   .legal-card,
-  .mode-switch {
+  .mode-switch,
+  .auth-bar {
     display: none !important;
   }
 

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="rentium-logo.png.png" />
   <title>Rentium - Simulateur locatif</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +25,14 @@
         <option value="pro">Pro (59 EUR)</option>
       </select>
       <button id="openPricingBtn" type="button" class="ghost-btn">Voir les plans</button>
+    </div>
+    <div class="auth-bar">
+      <input id="authEmail" type="email" placeholder="Email" autocomplete="email" />
+      <input id="authPassword" type="password" placeholder="Mot de passe" autocomplete="current-password" />
+      <button id="registerBtn" type="button" class="ghost-btn">Creer compte</button>
+      <button id="loginBtn" type="button">Connexion</button>
+      <button id="logoutBtn" type="button" class="ghost-btn" hidden>Deconnexion</button>
+      <small id="authState" class="auth-state">Non connecte</small>
     </div>
   </header>
 
@@ -214,10 +223,6 @@
           <button type="button" data-select-plan="pro">Choisir Pro</button>
         </article>
       </div>
-      <p class="pricing-note">
-        En production, branche ici Stripe ou LemonSqueezy pour un paiement reel.
-        Une page dediee est aussi disponible: <a href="payment.html">payment.html</a>.
-      </p>
     </section>
   </div>
   <script src="app.js"></script>
