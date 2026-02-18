@@ -948,15 +948,80 @@ function exportPdf() {
 
 function prepareProPrintReport() {
   if (!lastProAnalysis) return;
-  const { settings, score, recommendations } = lastProAnalysis;
+  const { settings, score, recommendations, fiscal, projection, results } = lastProAnalysis;
   const chartDataUrl = proChart ? proChart.toDataURL('image/png') : '';
+  const projectionRows = (projection?.rows || []).slice(0, 10);
+  const taxModeLabel = settings.taxMode === 'real'
+    ? 'Reel simplifie'
+    : (settings.taxMode === 'bare' ? 'Location vide' : 'Micro-BIC');
+  const scoreLines = [
+    ['Cashflow & resilience', score.cashflowPts, 30],
+    ['Rendement & revenus', score.yieldPts, 20],
+    ['Risque dette', score.debtPts, 20],
+    ['Sensibilite', score.stressPts, 15],
+    ['Efficience charges', score.costPts, 10],
+    ['Coherence fiscale', score.taxPts, 5]
+  ];
 
   proPrintReport.innerHTML = `
     <h3>Rapport Pro - Analyse avancee</h3>
     <p>Plan Pro (59 EUR) | Regime fiscal: ${escapeHtml(settings.taxMode)} | Horizon: ${settings.projectionYears} ans</p>
+
     <h4>Rentium Score</h4>
     <p><strong>${Math.round(score.total)}/100 - ${score.label}</strong></p>
-    <ul>${recommendations.slice(0, 8).map((r) => `<li>${escapeHtml(r.title)} (${formatSignedNumber(r.deltaScore)} pts, ${formatSignedCurrency(r.deltaCashflowMonthly)}/mois)</li>`).join('')}</ul>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Composant</th><th>Score</th></tr></thead>
+        <tbody>
+          ${scoreLines.map(([label, value, cap]) => `<tr><td>${escapeHtml(label)}</td><td>${Number(value).toFixed(1)} / ${cap}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Cashflow mensuel:</strong> ${formatCurrency(results.monthlyCashflow)} | <strong>DSCR:</strong> ${results.dscr.toFixed(2)} | <strong>LTV:</strong> ${formatPercent(results.ltv * 100)}</p>
+
+    <h4>Fiscalite</h4>
+    <p><strong>Regime:</strong> ${taxModeLabel} | <strong>Taux fiscal total:</strong> ${formatPercent(fiscal.taxRate * 100)}</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Indicateur</th><th>Valeur</th></tr></thead>
+        <tbody>
+          <tr><td>Base imposable selectionnee</td><td>${formatCurrency(fiscal.selectedTaxableBase)}</td></tr>
+          <tr><td>Impot annuel estime</td><td>${formatCurrency(fiscal.selectedTax)}</td></tr>
+          <tr><td>Cashflow annuel apres impot</td><td>${formatCurrency(fiscal.annualCashflowAfterTax)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Projection long terme</h4>
+    <p><strong>Cashflow cumule (${projection.horizon} ans):</strong> ${formatCurrency(projection.totalCashflow)} | <strong>Total avec sortie:</strong> ${formatCurrency(projection.totalWithExit)}</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Annee</th>
+            <th>Cashflow net</th>
+            <th>Cumule</th>
+            <th>Valeur nette revente</th>
+            <th>Total avec sortie</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${projectionRows.map((row) => `
+            <tr>
+              <td>${row.year}</td>
+              <td>${formatCurrency(row.cashflowAfterTax)}</td>
+              <td>${formatCurrency(row.cumulativeCashflow)}</td>
+              <td>${formatCurrency(row.netSaleValue)}</td>
+              <td>${formatCurrency(row.totalWithExit)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Recommandations prioritaires</h4>
+    <ul>${recommendations.slice(0, 8).map((r) => `<li>${escapeHtml(r.title)} (${formatSignedNumber(r.deltaScore)} pts, ${formatSignedCurrency(r.deltaCashflowMonthly)}/mois)</li>`).join('') || '<li>Aucune recommandation differenciante.</li>'}</ul>
+
     ${chartDataUrl ? `<h4>Graphique des flux</h4><img src="${chartDataUrl}" alt="Graphique Pro" />` : ''}
   `;
 }

@@ -13,6 +13,7 @@ const appUrl = process.env.APP_URL || `http://localhost:${port}`;
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const adminApiKey = String(process.env.ADMIN_API_KEY || '').trim();
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 const PRICE_IDS = {
@@ -143,6 +144,16 @@ function updateUser(userId, updater) {
   return users[index];
 }
 
+function updateUserByEmail(email, updater) {
+  const normalized = normalizeEmail(email);
+  const users = readUsers();
+  const index = users.findIndex((item) => item.email === normalized);
+  if (index === -1) return null;
+  users[index] = updater(users[index]);
+  writeUsers(users);
+  return users[index];
+}
+
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe || !webhookSecret) {
     return res.status(500).send('Stripe webhook non configure');
@@ -239,6 +250,26 @@ app.post('/api/auth/logout', authRequired, (req, res) => {
 
 app.get('/api/auth/me', authRequired, (req, res) => {
   res.json({ user: publicUser(req.user) });
+});
+
+app.post('/api/admin/set-plan', (req, res) => {
+  if (!adminApiKey) return res.status(503).json({ error: 'ADMIN_API_KEY manquant' });
+  const provided = String(req.headers['x-admin-key'] || req.body?.adminKey || '').trim();
+  if (!provided || provided !== adminApiKey) return res.status(401).json({ error: 'Acces refuse' });
+
+  const email = normalizeEmail(req.body?.email);
+  const plan = String(req.body?.plan || '').trim();
+  if (!email) return res.status(400).json({ error: 'Email manquant' });
+  if (!['free', 'essential', 'pro'].includes(plan)) return res.status(400).json({ error: 'Plan invalide' });
+
+  const updated = updateUserByEmail(email, (user) => ({
+    ...user,
+    plan,
+    updatedAt: new Date().toISOString()
+  }));
+  if (!updated) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+  return res.json({ ok: true, user: publicUser(updated) });
 });
 
 app.get('/api/me/plan', authRequired, (req, res) => {
