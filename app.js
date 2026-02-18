@@ -58,9 +58,33 @@ let lastChartRows = [];
 let chartHoverIndex = null;
 let chartLayout = null;
 
-init();
+bootstrap();
+
+function bootstrap() {
+  bindPlanSelectionButtons();
+  init();
+}
+
+function bindPlanSelectionButtons() {
+  document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest('[data-select-plan]');
+    if (!button) return;
+    selectPlanFromModal(button.dataset.selectPlan);
+  });
+}
 
 function init() {
+  const requiredElements = [
+    form, prefillRatesBtn, copyLinkBtn, saveScenarioBtn, exportPdfBtn, compareBtn,
+    upgradeCtaBtn, planSelect, scenariosList, comparisonArea, metricsContainer,
+    metricTemplate, cashflowBanner, errorBox
+  ];
+  if (requiredElements.some((el) => !el)) {
+    console.warn('Init partielle: certains elements UI sont manquants.');
+    return;
+  }
+
   hydrateFromQuery();
   handleCheckoutStatusFromQuery();
 
@@ -87,10 +111,6 @@ function init() {
 
   document.querySelectorAll('.pro-tab').forEach((tab) => {
     tab.addEventListener('click', () => switchProTab(tab.dataset.tab));
-  });
-
-  document.querySelectorAll('[data-select-plan]').forEach((btn) => {
-    btn.addEventListener('click', () => selectPlanFromModal(btn.dataset.selectPlan));
   });
 
   chartSeriesToggles.forEach((toggle) => {
@@ -1017,6 +1037,7 @@ function updatePremiumState() {
 }
 
 function setStatus(message) {
+  if (!statusText) return;
   statusText.textContent = message;
 }
 
