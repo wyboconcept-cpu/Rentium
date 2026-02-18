@@ -420,6 +420,18 @@ th, td {
   color: var(--muted);
 }
 
+.onboarding-auth {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.onboarding-auth input {
+  width: auto;
+  min-width: 220px;
+}
+
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -674,6 +686,11 @@ body.modal-open {
   }
 
   .auth-bar input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .onboarding-auth input {
     width: 100%;
     min-width: 0;
   }

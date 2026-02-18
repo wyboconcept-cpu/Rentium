@@ -24,6 +24,9 @@ const registerBtn = document.getElementById('registerBtn');
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const authState = document.getElementById('authState');
+const onboardingEmailInput = document.getElementById('onboardingEmail');
+const onboardingPasswordInput = document.getElementById('onboardingPassword');
+const onboardingLoginBtn = document.getElementById('onboardingLoginBtn');
 
 const proCard = document.getElementById('proCard');
 const proPaneTax = document.getElementById('proPaneTax');
@@ -107,9 +110,10 @@ function init() {
   if (openPricingBtn) openPricingBtn.addEventListener('click', openPricingModal);
   if (closePricingBtn) closePricingBtn.addEventListener('click', closePricingModal);
   if (pricingModal) pricingModal.addEventListener('click', onPricingModalClick);
-  if (registerBtn) registerBtn.addEventListener('click', registerAccount);
-  if (loginBtn) loginBtn.addEventListener('click', loginAccount);
+  if (registerBtn) registerBtn.addEventListener('click', () => { registerAccount(false); });
+  if (loginBtn) loginBtn.addEventListener('click', () => { loginAccount(false); });
   if (logoutBtn) logoutBtn.addEventListener('click', logoutAccount);
+  if (onboardingLoginBtn) onboardingLoginBtn.addEventListener('click', loginAccountFromOnboarding);
 
   [
     taxMode, marginalTaxRate, socialTaxRate, annualDepreciation, projectionYears,
@@ -1008,29 +1012,31 @@ function openPricingModal() {
 
 function closePricingModal() {
   if (!pricingModal) return;
+  if (!authToken) return;
   pricingModal.hidden = true;
   document.body.classList.remove('modal-open');
 }
 
 function onPricingModalClick(event) {
+  if (!authToken) return;
   if (event.target instanceof HTMLElement && event.target.dataset.closePricing === 'true') {
     closePricingModal();
   }
 }
 
-function selectPlanFromModal(plan) {
+async function selectPlanFromModal(plan) {
   if (!['free', 'essential', 'pro'].includes(plan)) return;
+  if (!authToken) {
+    const ready = await ensureAuthenticatedFromOnboarding();
+    if (!ready) return;
+  }
+
   if (plan === 'free') {
     planSelect.value = 'free';
     closePricingModal();
     updatePremiumState();
     computeAndRender();
     setStatus('Plan Gratuit active.');
-    return;
-  }
-
-  if (!authToken) {
-    setStatus('Connecte-toi d abord (email + mot de passe) pour acheter un plan.');
     return;
   }
 
@@ -1176,12 +1182,43 @@ async function loadScenariosFromServer() {
   }
 }
 
-async function registerAccount() {
-  const email = String(authEmailInput?.value || '').trim().toLowerCase();
-  const password = String(authPasswordInput?.value || '');
+function getAuthCredentials(preferOnboarding = false) {
+  const emailRaw = preferOnboarding
+    ? (onboardingEmailInput?.value || authEmailInput?.value || '')
+    : (authEmailInput?.value || onboardingEmailInput?.value || '');
+  const passwordRaw = preferOnboarding
+    ? (onboardingPasswordInput?.value || authPasswordInput?.value || '')
+    : (authPasswordInput?.value || onboardingPasswordInput?.value || '');
+
+  return {
+    email: String(emailRaw).trim().toLowerCase(),
+    password: String(passwordRaw || '')
+  };
+}
+
+function mirrorAuthInputs(email, clearPassword = false) {
+  if (authEmailInput) authEmailInput.value = email;
+  if (onboardingEmailInput) onboardingEmailInput.value = email;
+  if (clearPassword) {
+    if (authPasswordInput) authPasswordInput.value = '';
+    if (onboardingPasswordInput) onboardingPasswordInput.value = '';
+  }
+}
+
+async function applyAuthSession(data) {
+  authToken = data?.token || '';
+  if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+  currentUser = data?.user || null;
+  setAuthUI();
+  await loadScenariosFromServer();
+  await syncPlanFromServer();
+}
+
+async function registerAccount(preferOnboarding = false) {
+  const { email, password } = getAuthCredentials(preferOnboarding);
   if (!email || !password) {
     setStatus('Renseigne email et mot de passe.');
-    return;
+    return false;
   }
 
   try {
@@ -1191,24 +1228,21 @@ async function registerAccount() {
       body: JSON.stringify({ email, password }),
       includeAuth: false
     });
-    authToken = data.token || '';
-    if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
-    currentUser = data.user || null;
-    setAuthUI();
-    await loadScenariosFromServer();
-    await syncPlanFromServer();
+    await applyAuthSession(data);
+    mirrorAuthInputs(email, true);
     setStatus('Compte cree et connecte.');
+    return true;
   } catch (error) {
     setStatus(error.message || 'Impossible de creer le compte.');
+    return false;
   }
 }
 
-async function loginAccount() {
-  const email = String(authEmailInput?.value || '').trim().toLowerCase();
-  const password = String(authPasswordInput?.value || '');
+async function loginAccount(preferOnboarding = false) {
+  const { email, password } = getAuthCredentials(preferOnboarding);
   if (!email || !password) {
     setStatus('Renseigne email et mot de passe.');
-    return;
+    return false;
   }
 
   try {
@@ -1218,16 +1252,53 @@ async function loginAccount() {
       body: JSON.stringify({ email, password }),
       includeAuth: false
     });
-    authToken = data.token || '';
-    if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
-    currentUser = data.user || null;
-    setAuthUI();
-    await loadScenariosFromServer();
-    await syncPlanFromServer();
+    await applyAuthSession(data);
+    mirrorAuthInputs(email, true);
     setStatus('Connexion reussie.');
+    return true;
   } catch (error) {
     setStatus(error.message || 'Connexion impossible.');
+    return false;
   }
+}
+
+async function loginAccountFromOnboarding() {
+  const ok = await loginAccount(true);
+  if (ok) closePricingModal();
+}
+
+async function ensureAuthenticatedFromOnboarding() {
+  if (authToken && currentUser) return true;
+  const { email, password } = getAuthCredentials(true);
+  if (!email || !password) {
+    setStatus('Pour continuer, renseigne email + mot de passe puis choisis un plan.');
+    return false;
+  }
+
+  try {
+    const data = await apiFetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      includeAuth: false
+    });
+    await applyAuthSession(data);
+    mirrorAuthInputs(email, true);
+    setStatus('Compte cree. Tu peux continuer.');
+    return true;
+  } catch (error) {
+    if (!String(error.message || '').includes('deja utilise')) {
+      setStatus(error.message || 'Creation de compte impossible.');
+      return false;
+    }
+  }
+
+  const logged = await loginAccount(true);
+  if (!logged) {
+    setStatus('Compte existant detecte: utilise le bon mot de passe puis clique "J ai deja un compte".');
+    return false;
+  }
+  return true;
 }
 
 async function logoutAccount() {
@@ -1250,6 +1321,8 @@ async function logoutAccount() {
 async function syncAuthState() {
   if (!authToken) {
     setAuthUI();
+    openPricingModal();
+    setStatus('Choisis un plan pour creer ton compte et acceder au simulateur.');
     return;
   }
 
@@ -1264,6 +1337,7 @@ async function syncAuthState() {
     currentUser = null;
     localStorage.removeItem(AUTH_TOKEN_KEY);
     setAuthUI();
+    openPricingModal();
   }
 }
 
@@ -1279,6 +1353,10 @@ function setAuthUI() {
   if (registerBtn) registerBtn.hidden = connected;
   if (authEmailInput) authEmailInput.disabled = connected;
   if (authPasswordInput) authPasswordInput.disabled = connected;
+  if (closePricingBtn) closePricingBtn.hidden = !connected;
+  if (onboardingLoginBtn) onboardingLoginBtn.hidden = connected;
+  if (onboardingEmailInput) onboardingEmailInput.disabled = connected;
+  if (onboardingPasswordInput) onboardingPasswordInput.disabled = connected;
 }
 
 async function apiFetch(url, options = {}) {
