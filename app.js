@@ -1098,6 +1098,10 @@ async function selectPlanFromModal(plan) {
 
   if (plan === 'free') {
     planSelect.value = 'free';
+    if (currentUser) {
+      currentUser = { ...currentUser, plan: 'free' };
+      setAuthUI();
+    }
     closePricingModal();
     updatePremiumState();
     computeAndRender();
@@ -1408,9 +1412,12 @@ async function syncAuthState() {
 
 function setAuthUI() {
   const connected = Boolean(currentUser && authToken);
+  const displayPlan = connected
+    ? (currentUser?.plan || planSelect?.value || 'free')
+    : 'free';
   if (authState) {
     authState.textContent = connected
-      ? `Connecte: ${currentUser.email} (${currentUser.plan || 'free'})`
+      ? `Connecte: ${currentUser.email} (${displayPlan})`
       : 'Non connecte';
   }
   if (logoutBtn) logoutBtn.hidden = !connected;
