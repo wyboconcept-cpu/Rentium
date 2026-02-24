@@ -1369,7 +1369,10 @@ async function loginAccount(preferOnboarding = false) {
 
 async function loginAccountFromOnboarding() {
   const ok = await loginAccount(true);
-  if (ok) closePricingModal();
+  if (!ok) return;
+  closePricingModal();
+  updatePremiumState();
+  computeAndRender();
 }
 
 async function ensureAuthenticatedFromOnboarding() {
@@ -1438,6 +1441,7 @@ async function syncAuthState() {
     setAuthUI();
     await loadScenariosFromServer();
     await syncPlanFromServer();
+    closePricingModal();
   } catch {
     authToken = '';
     currentUser = null;
