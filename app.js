@@ -28,6 +28,7 @@ const authState = document.getElementById('authState');
 const onboardingEmailInput = document.getElementById('onboardingEmail');
 const onboardingPasswordInput = document.getElementById('onboardingPassword');
 const onboardingLoginBtn = document.getElementById('onboardingLoginBtn');
+const onboardingStatus = document.getElementById('onboardingStatus');
 const adminCard = document.getElementById('adminCard');
 const adminUsersBody = document.getElementById('adminUsersBody');
 const refreshAdminBtn = document.getElementById('refreshAdminBtn');
@@ -1233,6 +1234,11 @@ function setStatus(message) {
   statusText.textContent = message;
 }
 
+function setOnboardingStatus(message) {
+  if (!onboardingStatus) return;
+  onboardingStatus.textContent = message || '';
+}
+
 async function startStripeCheckout(plan) {
   try {
     if (!authToken) {
@@ -1429,12 +1435,39 @@ async function loginAccount(preferOnboarding = false) {
 }
 
 async function loginAccountFromOnboarding() {
-  const ok = await loginAccount(true);
-  if (!ok) return;
-  closePricingModal();
-  updatePremiumState();
-  computeAndRender();
-  window.location.href = '/index.html';
+  const { email, password } = getAuthCredentials(true);
+  if (!email || !password) {
+    setOnboardingStatus('Renseigne email et mot de passe.');
+    return;
+  }
+
+  try {
+    const check = await apiFetch('/api/auth/check-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      includeAuth: false
+    });
+
+    if (!check?.exists) {
+      setOnboardingStatus('Compte introuvable. Cree un compte via un plan.');
+      return;
+    }
+
+    const ok = await loginAccount(true);
+    if (!ok) {
+      setOnboardingStatus('Compte trouve, mot de passe incorrect.');
+      return;
+    }
+
+    setOnboardingStatus('');
+    closePricingModal();
+    updatePremiumState();
+    computeAndRender();
+    window.location.replace('/index.html');
+  } catch (error) {
+    setOnboardingStatus(error.message || 'Connexion impossible.');
+  }
 }
 
 async function ensureAuthenticatedFromOnboarding() {
@@ -1533,6 +1566,7 @@ function setAuthUI() {
   if (onboardingLoginBtn) onboardingLoginBtn.hidden = connected;
   if (onboardingEmailInput) onboardingEmailInput.disabled = connected;
   if (onboardingPasswordInput) onboardingPasswordInput.disabled = connected;
+  if (connected) setOnboardingStatus('');
   if (adminCard) adminCard.hidden = !(connected && currentUser?.isAdmin === true);
   if (adminCard && adminCard.hidden) renderAdminUsersTable([]);
 }

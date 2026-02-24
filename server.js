@@ -252,6 +252,13 @@ app.post('/api/auth/login', (req, res) => {
   return res.json({ token, user: publicUser(user) });
 });
 
+app.post('/api/auth/check-email', (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email || !email.includes('@')) return res.status(400).json({ error: 'Email invalide' });
+  const exists = readUsers().some((user) => user.email === email);
+  return res.json({ exists });
+});
+
 app.post('/api/auth/logout', authRequired, (req, res) => {
   removeSession(req.authToken);
   res.json({ ok: true });
