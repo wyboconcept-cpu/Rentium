@@ -14,6 +14,7 @@ const appUrl = process.env.APP_URL || `http://localhost:${port}`;
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const adminApiKey = String(process.env.ADMIN_API_KEY || '').trim();
+const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL || 'wyboantoine@gmail.com');
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 const PRICE_IDS = {
@@ -110,11 +111,19 @@ function authRequired(req, res, next) {
   next();
 }
 
+function adminRequired(req, res, next) {
+  if (normalizeEmail(req.user?.email) !== adminEmail) {
+    return res.status(403).json({ error: 'Acces admin refuse' });
+  }
+  next();
+}
+
 function publicUser(user) {
   return {
     id: user.id,
     email: user.email,
-    plan: user.plan || 'free'
+    plan: user.plan || 'free',
+    isAdmin: normalizeEmail(user.email) === adminEmail
   };
 }
 
@@ -269,6 +278,32 @@ app.post('/api/admin/set-plan', (req, res) => {
   }));
   if (!updated) return res.status(404).json({ error: 'Utilisateur introuvable' });
 
+  return res.json({ ok: true, user: publicUser(updated) });
+});
+
+app.get('/api/admin/users', authRequired, adminRequired, (_req, res) => {
+  const users = readUsers().map((user) => ({
+    id: user.id,
+    email: user.email,
+    plan: user.plan || 'free',
+    createdAt: user.createdAt || null,
+    updatedAt: user.updatedAt || null
+  }));
+  return res.json({ users });
+});
+
+app.put('/api/admin/users/:userId/plan', authRequired, adminRequired, (req, res) => {
+  const userId = String(req.params.userId || '');
+  const plan = String(req.body?.plan || '').trim();
+  if (!userId) return res.status(400).json({ error: 'userId manquant' });
+  if (!['free', 'essential', 'pro'].includes(plan)) return res.status(400).json({ error: 'Plan invalide' });
+
+  const updated = updateUser(userId, (user) => ({
+    ...user,
+    plan,
+    updatedAt: new Date().toISOString()
+  }));
+  if (!updated) return res.status(404).json({ error: 'Utilisateur introuvable' });
   return res.json({ ok: true, user: publicUser(updated) });
 });
 

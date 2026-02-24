@@ -125,6 +125,10 @@ body {
   grid-column: 1;
 }
 
+.admin-card {
+  grid-column: 1;
+}
+
 .upgrade-card {
   grid-column: 1;
   border-color: #5d4728;

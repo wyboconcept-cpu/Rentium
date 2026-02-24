@@ -16,7 +16,7 @@
 
   <header class="app-header">
     <h1>Rentium</h1>
-    <p>Simulateur de rentabilite locative - Version Essentiel</p>
+    <p id="planTagline">Simulateur de rentabilite locative - Version Gratuit</p>
     <div class="mode-switch">
       <label for="planSelect">Plan</label>
       <select id="planSelect">
@@ -79,6 +79,29 @@
       </div>
       <div id="scenariosList" class="scenarios-list"></div>
       <div id="comparisonArea" class="comparison-area"></div>
+    </section>
+
+    <section class="card admin-card" id="adminCard" hidden>
+      <div class="section-head">
+        <h2>Administration</h2>
+        <button id="refreshAdminBtn" type="button" class="ghost-btn">Rafraichir</button>
+      </div>
+      <p class="pro-hint">Visible uniquement pour le compte admin.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Plan actuel</th>
+              <th>Nouveau plan</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="adminUsersBody">
+            <tr><td colspan="4">Aucun utilisateur charge.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section class="card upgrade-card">

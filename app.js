@@ -18,6 +18,7 @@ const upgradeCtaBtn = document.getElementById('upgradeCtaBtn');
 const openPricingBtn = document.getElementById('openPricingBtn');
 const pricingModal = document.getElementById('pricingModal');
 const closePricingBtn = document.getElementById('closePricingBtn');
+const planTagline = document.getElementById('planTagline');
 const authEmailInput = document.getElementById('authEmail');
 const authPasswordInput = document.getElementById('authPassword');
 const registerBtn = document.getElementById('registerBtn');
@@ -27,6 +28,9 @@ const authState = document.getElementById('authState');
 const onboardingEmailInput = document.getElementById('onboardingEmail');
 const onboardingPasswordInput = document.getElementById('onboardingPassword');
 const onboardingLoginBtn = document.getElementById('onboardingLoginBtn');
+const adminCard = document.getElementById('adminCard');
+const adminUsersBody = document.getElementById('adminUsersBody');
+const refreshAdminBtn = document.getElementById('refreshAdminBtn');
 
 const proCard = document.getElementById('proCard');
 const proPaneTax = document.getElementById('proPaneTax');
@@ -69,6 +73,7 @@ let chartLayout = null;
 let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
 let currentUser = null;
 let scenariosCache = readLocalScenarios();
+let adminUsersCache = [];
 
 bootstrap();
 
@@ -114,6 +119,8 @@ function init() {
   if (loginBtn) loginBtn.addEventListener('click', () => { loginAccount(false); });
   if (logoutBtn) logoutBtn.addEventListener('click', logoutAccount);
   if (onboardingLoginBtn) onboardingLoginBtn.addEventListener('click', loginAccountFromOnboarding);
+  if (refreshAdminBtn) refreshAdminBtn.addEventListener('click', loadAdminUsers);
+  if (adminUsersBody) adminUsersBody.addEventListener('click', onAdminUsersTableClick);
 
   [
     taxMode, marginalTaxRate, socialTaxRate, annualDepreciation, projectionYears,
@@ -217,9 +224,18 @@ function computeResults(data) {
 function computeAndRender() {
   const inputs = readInputs();
   const results = computeResults(inputs);
+  const settings = readProSettings();
+
+  let cashflowValue = results.monthlyCashflow;
+  let cashflowAfterTax = false;
+  if (isProPlan()) {
+    const fiscal = computeFiscalAnalysis(inputs, results, settings);
+    cashflowValue = fiscal.annualCashflowAfterTax / 12;
+    cashflowAfterTax = true;
+  }
 
   renderMetrics(results);
-  renderCashflow(results.monthlyCashflow);
+  renderCashflow(cashflowValue, cashflowAfterTax);
   renderUncertainty(computeUncertaintyRange(inputs));
   renderUpgradePrompt(results);
 
@@ -236,11 +252,12 @@ function renderMetrics(results) {
   });
 }
 
-function renderCashflow(value) {
+function renderCashflow(value, afterTax = false) {
   const positive = value >= 0;
   cashflowBanner.classList.toggle('positive', positive);
   cashflowBanner.classList.toggle('negative', !positive);
-  cashflowBanner.textContent = `${positive ? 'Cashflow positif' : 'Cashflow negatif'}: ${formatCurrency(value)} / mois`;
+  const suffix = afterTax ? ' apres impot' : '';
+  cashflowBanner.textContent = `${positive ? 'Cashflow positif' : 'Cashflow negatif'}${suffix}: ${formatCurrency(value)} / mois`;
 }
 
 function computeUncertaintyRange(data) {
@@ -1136,10 +1153,18 @@ function updatePremiumState() {
   });
 
   proCard.hidden = !isProPlan();
+  updatePlanTagline();
 
   if (planSelect.value === 'free') setStatus('Plan Gratuit actif: export/sauvegarde/comparaison reserves aux plans payants.');
   else if (planSelect.value === 'essential') setStatus('Plan Essentiel actif. Active le plan Pro pour le score et recommandations.');
   else setStatus('Plan Pro actif: score, recommandations et analyses avancees disponibles.');
+}
+
+function updatePlanTagline() {
+  if (!planTagline) return;
+  const plan = planSelect?.value || 'free';
+  const label = plan === 'pro' ? 'Pro' : (plan === 'essential' ? 'Essentiel' : 'Gratuit');
+  planTagline.textContent = `Simulateur de rentabilite locative - Version ${label}`;
 }
 
 function setStatus(message) {
@@ -1291,6 +1316,7 @@ async function applyAuthSession(data) {
   setAuthUI();
   await loadScenariosFromServer();
   await syncPlanFromServer();
+  await loadAdminUsers();
 }
 
 async function registerAccount(preferOnboarding = false) {
@@ -1391,6 +1417,7 @@ async function logoutAccount() {
 
   authToken = '';
   currentUser = null;
+  adminUsersCache = [];
   localStorage.removeItem(AUTH_TOKEN_KEY);
   setAuthUI();
   await syncPlanFromServer();
@@ -1414,6 +1441,7 @@ async function syncAuthState() {
   } catch {
     authToken = '';
     currentUser = null;
+    adminUsersCache = [];
     localStorage.removeItem(AUTH_TOKEN_KEY);
     setAuthUI();
     openPricingModal();
@@ -1439,6 +1467,72 @@ function setAuthUI() {
   if (onboardingLoginBtn) onboardingLoginBtn.hidden = connected;
   if (onboardingEmailInput) onboardingEmailInput.disabled = connected;
   if (onboardingPasswordInput) onboardingPasswordInput.disabled = connected;
+  if (adminCard) adminCard.hidden = !(connected && currentUser?.isAdmin === true);
+  if (adminCard && adminCard.hidden) renderAdminUsersTable([]);
+}
+
+async function loadAdminUsers() {
+  if (!authToken || !currentUser?.isAdmin) {
+    adminUsersCache = [];
+    renderAdminUsersTable([]);
+    return;
+  }
+
+  try {
+    const data = await apiFetch('/api/admin/users', { method: 'GET' });
+    adminUsersCache = Array.isArray(data?.users) ? data.users : [];
+    renderAdminUsersTable(adminUsersCache);
+  } catch (error) {
+    setStatus(error.message || 'Impossible de charger les utilisateurs admin.');
+  }
+}
+
+function renderAdminUsersTable(users) {
+  if (!adminUsersBody) return;
+  if (!Array.isArray(users) || !users.length) {
+    adminUsersBody.innerHTML = '<tr><td colspan="4">Aucun utilisateur charge.</td></tr>';
+    return;
+  }
+
+  adminUsersBody.innerHTML = users.map((user) => `
+    <tr data-user-id="${escapeHtml(user.id)}">
+      <td>${escapeHtml(user.email)}</td>
+      <td>${escapeHtml(user.plan || 'free')}</td>
+      <td>
+        <select class="admin-plan-select">
+          <option value="free" ${user.plan === 'free' ? 'selected' : ''}>free</option>
+          <option value="essential" ${user.plan === 'essential' ? 'selected' : ''}>essential</option>
+          <option value="pro" ${user.plan === 'pro' ? 'selected' : ''}>pro</option>
+        </select>
+      </td>
+      <td><button type="button" class="admin-save-plan-btn">Enregistrer</button></td>
+    </tr>
+  `).join('');
+}
+
+async function onAdminUsersTableClick(event) {
+  if (!(event.target instanceof HTMLElement)) return;
+  if (!event.target.classList.contains('admin-save-plan-btn')) return;
+
+  const row = event.target.closest('tr[data-user-id]');
+  if (!(row instanceof HTMLElement)) return;
+  const userId = row.dataset.userId;
+  const select = row.querySelector('.admin-plan-select');
+  if (!(select instanceof HTMLSelectElement)) return;
+  const plan = select.value;
+  if (!userId || !['free', 'essential', 'pro'].includes(plan)) return;
+
+  try {
+    await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}/plan`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan })
+    });
+    setStatus(`Plan utilisateur mis a jour: ${plan}`);
+    await loadAdminUsers();
+  } catch (error) {
+    setStatus(error.message || 'Mise a jour du plan impossible.');
+  }
 }
 
 async function apiFetch(url, options = {}) {
