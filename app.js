@@ -55,6 +55,13 @@ const exitCostRate = document.getElementById('exitCostRate');
 
 const STORAGE_KEY = 'rentium_scenarios_v1';
 const AUTH_TOKEN_KEY = 'rentium_auth_token_v1';
+const UNKNOWN_FIELD_DEFAULTS = {
+  vacancyRate: { value: 8, label: 'Vacance locative', unit: '%' },
+  managementRate: { value: 7, label: 'Gestion locative', unit: '%' },
+  monthlyCharges: { value: 110, label: 'Charges non recuperables', unit: 'EUR/mois' },
+  propertyTax: { value: 1300, label: 'Taxe fonciere', unit: 'EUR/an' },
+  annualMaintenance: { value: 1000, label: 'Entretien', unit: 'EUR/an' }
+};
 const metricConfig = [
   ['loanAmount', 'Emprunt estime'],
   ['monthlyPayment', 'Mensualite credit (hors assurance)'],
@@ -74,6 +81,7 @@ let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
 let currentUser = null;
 let scenariosCache = readLocalScenarios();
 let adminUsersCache = [];
+let lastInputMeta = { unknownFields: [], confidence: 'elevee', assumptionsText: '' };
 
 bootstrap();
 
@@ -119,6 +127,14 @@ function init() {
   if (loginBtn) loginBtn.addEventListener('click', () => { loginAccount(false); });
   if (logoutBtn) logoutBtn.addEventListener('click', logoutAccount);
   if (onboardingLoginBtn) onboardingLoginBtn.addEventListener('click', loginAccountFromOnboarding);
+  if (onboardingPasswordInput) {
+    onboardingPasswordInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        loginAccountFromOnboarding();
+      }
+    });
+  }
   if (refreshAdminBtn) refreshAdminBtn.addEventListener('click', loadAdminUsers);
   if (adminUsersBody) adminUsersBody.addEventListener('click', onAdminUsersTableClick);
 
@@ -158,8 +174,30 @@ function readInputs() {
   const fd = new FormData(form);
   const data = {};
   for (const [key, value] of fd.entries()) data[key] = Number(value || 0);
+
+  const unknownFields = [];
+  Object.entries(UNKNOWN_FIELD_DEFAULTS).forEach(([field, cfg]) => {
+    const checkbox = document.querySelector(`[data-unknown-field="${field}"]`);
+    if (!(checkbox instanceof HTMLInputElement) || !checkbox.checked) return;
+    data[field] = cfg.value;
+    unknownFields.push(field);
+  });
+
   data.vacancyRate = clamp(data.vacancyRate, 0, 50);
   data.managementRate = clamp(data.managementRate, 0, 20);
+
+  const assumptionsText = unknownFields.length
+    ? unknownFields.map((field) => {
+      const cfg = UNKNOWN_FIELD_DEFAULTS[field];
+      return `${cfg.label}: ${cfg.value} ${cfg.unit}`;
+    }).join(' | ')
+    : '';
+
+  let confidence = 'elevee';
+  if (unknownFields.length >= 3) confidence = 'faible';
+  else if (unknownFields.length >= 1) confidence = 'moyenne';
+
+  lastInputMeta = { unknownFields, assumptionsText, confidence };
   return data;
 }
 
@@ -236,7 +274,7 @@ function computeAndRender() {
 
   renderMetrics(results);
   renderCashflow(cashflowValue, cashflowAfterTax);
-  renderUncertainty(computeUncertaintyRange(inputs));
+  renderUncertainty(computeUncertaintyRange(inputs, lastInputMeta), lastInputMeta);
   renderUpgradePrompt(results);
 
   if (isProPlan()) renderProAnalysis(inputs, results);
@@ -260,9 +298,26 @@ function renderCashflow(value, afterTax = false) {
   cashflowBanner.textContent = `${positive ? 'Cashflow positif' : 'Cashflow negatif'}${suffix}: ${formatCurrency(value)} / mois`;
 }
 
-function computeUncertaintyRange(data) {
-  const prudent = { ...data, monthlyRent: data.monthlyRent * 0.97, vacancyRate: clamp(data.vacancyRate + 3, 0, 50), monthlyCharges: data.monthlyCharges * 1.1, annualMaintenance: data.annualMaintenance * 1.15, managementRate: clamp(data.managementRate + 1, 0, 20) };
-  const optimistic = { ...data, monthlyRent: data.monthlyRent * 1.02, vacancyRate: clamp(data.vacancyRate - 2, 0, 50), monthlyCharges: data.monthlyCharges * 0.95, annualMaintenance: data.annualMaintenance * 0.9, managementRate: clamp(data.managementRate - 1, 0, 20) };
+function computeUncertaintyRange(data, meta = { unknownFields: [] }) {
+  const unknownCount = Array.isArray(meta.unknownFields) ? meta.unknownFields.length : 0;
+  const spread = 1 + (unknownCount * 0.25);
+
+  const prudent = {
+    ...data,
+    monthlyRent: data.monthlyRent * (1 - (0.03 * spread)),
+    vacancyRate: clamp(data.vacancyRate + (3 * spread), 0, 50),
+    monthlyCharges: data.monthlyCharges * (1 + (0.1 * spread)),
+    annualMaintenance: data.annualMaintenance * (1 + (0.15 * spread)),
+    managementRate: clamp(data.managementRate + (1 * spread), 0, 20)
+  };
+  const optimistic = {
+    ...data,
+    monthlyRent: data.monthlyRent * (1 + (0.02 * spread)),
+    vacancyRate: clamp(data.vacancyRate - (2 * spread), 0, 50),
+    monthlyCharges: data.monthlyCharges * (1 - (0.05 * spread)),
+    annualMaintenance: data.annualMaintenance * (1 - (0.1 * spread)),
+    managementRate: clamp(data.managementRate - (1 * spread), 0, 20)
+  };
   const a = computeResults(prudent);
   const b = computeResults(optimistic);
   return {
@@ -273,10 +328,16 @@ function computeUncertaintyRange(data) {
   };
 }
 
-function renderUncertainty(range) {
+function renderUncertainty(range, meta = { unknownFields: [], confidence: 'elevee', assumptionsText: '' }) {
+  const assumptionsLine = meta.assumptionsText
+    ? `<p><strong>Hypotheses auto:</strong> ${escapeHtml(meta.assumptionsText)}</p>`
+    : '<p><strong>Hypotheses auto:</strong> aucune (toutes les donnees sont renseignees).</p>';
+
   errorBox.innerHTML = `
     <h3>Marge d'erreur estimee</h3>
     <p>Fourchette selon hypotheses prudentes/optimistes sur loyer, vacance, charges, entretien et gestion.</p>
+    <p><strong>Niveau de confiance:</strong> ${escapeHtml(meta.confidence)}</p>
+    ${assumptionsLine}
     <p>Cashflow mensuel probable: <strong>${formatCurrency(range.minCashflow)}</strong> a <strong>${formatCurrency(range.maxCashflow)}</strong></p>
     <p>Rendement net probable: <strong>${formatPercent(range.minNetYield)}</strong> a <strong>${formatPercent(range.maxNetYield)}</strong></p>
   `;
@@ -1373,6 +1434,7 @@ async function loginAccountFromOnboarding() {
   closePricingModal();
   updatePremiumState();
   computeAndRender();
+  window.location.href = '/index.html';
 }
 
 async function ensureAuthenticatedFromOnboarding() {

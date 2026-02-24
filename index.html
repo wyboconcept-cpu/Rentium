@@ -48,11 +48,31 @@
         <label>Duree du credit (ans)<input name="loanYears" type="number" min="1" step="1" value="20" required></label>
         <label>Assurance annuelle (%)<input name="insuranceRate" type="number" min="0" step="0.01" value="0.34" required></label>
         <label>Loyer mensuel<input name="monthlyRent" type="number" min="0" step="10" value="980" required></label>
-        <label>Vacance locative (%)<input name="vacancyRate" type="number" min="0" max="100" step="0.1" value="5" required></label>
-        <label>Charges non recuperables / mois<input name="monthlyCharges" type="number" min="0" step="10" value="95" required></label>
-        <label>Taxe fonciere annuelle<input name="propertyTax" type="number" min="0" step="10" value="1200" required></label>
-        <label>Gestion locative (%)<input name="managementRate" type="number" min="0" max="100" step="0.1" value="7" required></label>
-        <label>Entretien annuel<input name="annualMaintenance" type="number" min="0" step="10" value="900" required></label>
+        <label>
+          Vacance locative (%)
+          <input name="vacancyRate" type="number" min="0" max="100" step="0.1" value="5" required>
+          <span class="unknown-toggle"><input type="checkbox" data-unknown-field="vacancyRate"> Je ne sais pas</span>
+        </label>
+        <label>
+          Charges non recuperables / mois
+          <input name="monthlyCharges" type="number" min="0" step="10" value="95" required>
+          <span class="unknown-toggle"><input type="checkbox" data-unknown-field="monthlyCharges"> Je ne sais pas</span>
+        </label>
+        <label>
+          Taxe fonciere annuelle
+          <input name="propertyTax" type="number" min="0" step="10" value="1200" required>
+          <span class="unknown-toggle"><input type="checkbox" data-unknown-field="propertyTax"> Je ne sais pas</span>
+        </label>
+        <label>
+          Gestion locative (%)
+          <input name="managementRate" type="number" min="0" max="100" step="0.1" value="7" required>
+          <span class="unknown-toggle"><input type="checkbox" data-unknown-field="managementRate"> Je ne sais pas</span>
+        </label>
+        <label>
+          Entretien annuel
+          <input name="annualMaintenance" type="number" min="0" step="10" value="900" required>
+          <span class="unknown-toggle"><input type="checkbox" data-unknown-field="annualMaintenance"> Je ne sais pas</span>
+        </label>
       </form>
 
       <div class="actions">
