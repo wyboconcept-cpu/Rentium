@@ -18,8 +18,8 @@
     <h1>Rentium</h1>
     <p id="planTagline">Simulateur de rentabilite locative - Version Gratuit</p>
     <div class="mode-switch">
-      <label for="planSelect">Plan</label>
-      <select id="planSelect">
+      <span id="currentPlanBadge" class="current-plan-badge">Plan actif: Gratuit</span>
+      <select id="planSelect" hidden aria-hidden="true">
         <option value="free">Gratuit</option>
         <option value="essential">Essentiel (29 EUR)</option>
         <option value="pro">Pro (59 EUR)</option>

@@ -76,6 +76,15 @@ body {
   gap: 8px;
 }
 
+.current-plan-badge {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  background: #181511;
+}
+
 .auth-bar {
   grid-column: 1 / -1;
   display: flex;

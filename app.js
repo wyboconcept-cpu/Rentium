@@ -19,6 +19,7 @@ const openPricingBtn = document.getElementById('openPricingBtn');
 const pricingModal = document.getElementById('pricingModal');
 const closePricingBtn = document.getElementById('closePricingBtn');
 const planTagline = document.getElementById('planTagline');
+const currentPlanBadge = document.getElementById('currentPlanBadge');
 const authEmailInput = document.getElementById('authEmail');
 const authPasswordInput = document.getElementById('authPassword');
 const registerBtn = document.getElementById('registerBtn');
@@ -143,11 +144,6 @@ function init() {
     taxMode, marginalTaxRate, socialTaxRate, annualDepreciation, projectionYears,
     annualRentGrowth, annualChargeGrowth, annualPropertyGrowth, exitCostRate
   ].forEach((el) => el && el.addEventListener('input', computeAndRender));
-
-  planSelect.addEventListener('change', () => {
-    updatePremiumState();
-    computeAndRender();
-  });
 
   document.querySelectorAll('.pro-tab').forEach((tab) => {
     tab.addEventListener('click', () => switchProTab(tab.dataset.tab));
@@ -1129,8 +1125,6 @@ function copyShareLink() {
     Object.entries(pro).forEach(([k, v]) => params.set(k, v === null ? 'unknown' : String(v)));
   }
 
-  params.set('plan', planSelect.value);
-
   const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   navigator.clipboard.writeText(url)
     .then(() => setStatus('Lien de simulation copie.'))
@@ -1146,7 +1140,6 @@ function hydrateFromQuery() {
     if (field) field.value = v;
   }
 
-  if (params.get('plan')) planSelect.value = params.get('plan');
   if (params.get('taxMode')) taxMode.value = normalizeTaxMode(params.get('taxMode'));
   if (params.get('marginalTaxRate')) marginalTaxRate.value = params.get('marginalTaxRate');
   if (params.get('socialTaxRate')) socialTaxRate.value = params.get('socialTaxRate');
@@ -1227,6 +1220,7 @@ function updatePlanTagline() {
   const plan = planSelect?.value || 'free';
   const label = plan === 'pro' ? 'Pro' : (plan === 'essential' ? 'Essentiel' : 'Gratuit');
   planTagline.textContent = `Simulateur de rentabilite locative - Version ${label}`;
+  if (currentPlanBadge) currentPlanBadge.textContent = `Plan actif: ${label}`;
 }
 
 function setStatus(message) {
