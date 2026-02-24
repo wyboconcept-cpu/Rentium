@@ -159,7 +159,7 @@ function readInputs() {
 function readProSettings() {
   const tmiRaw = marginalTaxRate ? marginalTaxRate.value : 'unknown';
   return {
-    taxMode: taxMode ? taxMode.value : 'micro',
+    taxMode: normalizeTaxMode(taxMode ? taxMode.value : 'lmnp-micro'),
     marginalTaxRate: tmiRaw === 'unknown' ? null : Number(tmiRaw),
     socialTaxRate: Number(socialTaxRate ? socialTaxRate.value : 17.2) || 0,
     annualDepreciation: Number(annualDepreciation ? annualDepreciation.value : 0) || 0,
@@ -309,34 +309,34 @@ function computeFiscalAnalysis(inputs, results, settings) {
   const schedule = generateLoanSchedule(results.loanAmount, inputs.interestRate, inputs.loanYears, results.monthlyPayment);
   const interestYear1 = schedule.length ? schedule[0].interest : 0;
 
-  const taxableMicro = Math.max(results.annualCollectedRent * 0.5, 0);
-  const taxableReal = Math.max(results.annualCollectedRent - results.annualOperatingCharges - interestYear1 - settings.annualDepreciation, 0);
-  const taxableBare = Math.max(results.annualCollectedRent - results.annualOperatingCharges - interestYear1, 0);
+  const taxableLmnpMicro = Math.max(results.annualCollectedRent * 0.5, 0);
+  const taxableLmnpReal = Math.max(
+    results.annualCollectedRent - results.annualOperatingCharges - interestYear1 - settings.annualDepreciation,
+    0
+  );
+  const taxableNueMicroFoncier = Math.max(results.annualCollectedRent * 0.7, 0);
+  const taxableNueReelFoncier = Math.max(results.annualCollectedRent - results.annualOperatingCharges - interestYear1, 0);
 
-  const taxMicro = taxableMicro * taxRate;
-  const taxReal = taxableReal * taxRate;
-  const taxBare = taxableBare * taxRate;
+  const taxableByMode = {
+    'lmnp-micro': taxableLmnpMicro,
+    'lmnp-real': taxableLmnpReal,
+    'nue-micro-foncier': taxableNueMicroFoncier,
+    'nue-reel-foncier': taxableNueReelFoncier
+  };
 
-  let selectedTax = taxMicro;
-  let selectedTaxableBase = taxableMicro;
-  if (settings.taxMode === 'real') {
-    selectedTax = taxReal;
-    selectedTaxableBase = taxableReal;
-  } else if (settings.taxMode === 'bare') {
-    selectedTax = taxBare;
-    selectedTaxableBase = taxableBare;
-  }
+  const mode = normalizeTaxMode(settings.taxMode);
+  let selectedTaxableBase = taxableByMode[mode] ?? taxableLmnpMicro;
+  let selectedTax = selectedTaxableBase * taxRate;
   if (!hasTaxProfile) selectedTax = 0;
 
   return {
+    mode,
     taxRate,
     hasTaxProfile,
-    taxableMicro,
-    taxableReal,
-    taxableBare,
-    taxMicro,
-    taxReal,
-    taxBare,
+    taxableLmnpMicro,
+    taxableLmnpReal,
+    taxableNueMicroFoncier,
+    taxableNueReelFoncier,
     selectedTax,
     selectedTaxableBase,
     annualCashflowAfterTax: results.annualCashflow - selectedTax
@@ -364,9 +364,11 @@ function computeProjection(inputs, results, settings) {
     const remainingBalance = year <= schedule.length ? schedule[year - 1].balance : 0;
     const credit = payment + results.annualInsurance;
 
-    let taxable = Math.max(rent * 0.5, 0);
-    if (settings.taxMode === 'real') taxable = Math.max(rent - charges - interest - settings.annualDepreciation, 0);
-    if (settings.taxMode === 'bare') taxable = Math.max(rent - charges - interest, 0);
+    const mode = normalizeTaxMode(settings.taxMode);
+    let taxable = Math.max(rent * 0.5, 0); // LMNP micro-BIC
+    if (mode === 'lmnp-real') taxable = Math.max(rent - charges - interest - settings.annualDepreciation, 0);
+    if (mode === 'nue-micro-foncier') taxable = Math.max(rent * 0.7, 0);
+    if (mode === 'nue-reel-foncier') taxable = Math.max(rent - charges - interest, 0);
 
     const tax = taxable * taxRate;
     const cashflowAfterTax = rent - charges - credit - tax;
@@ -549,7 +551,13 @@ function generateRecommendations(inputs, settings, baseResults, baseScore) {
     addReco('autogestion', 'Passer en autogestion', 'High', 'Temps de gestion supplementaire', '0 %', { ...inputs, managementRate: 0 });
   }
 
-  if (settings.taxMode === 'micro') addReco('tax-real', 'Basculer Micro-BIC -> Reel', 'Med', 'Si amortissement pertinent', 'Regime reel', { ...inputs }, { ...settings, taxMode: 'real' });
+  const normalizedMode = normalizeTaxMode(settings.taxMode);
+  if (normalizedMode === 'lmnp-micro') {
+    addReco('tax-lmnp-real', 'Basculer LMNP Micro-BIC -> LMNP Reel', 'Med', 'Si amortissement pertinent', 'LMNP Reel', { ...inputs }, { ...settings, taxMode: 'lmnp-real' });
+  }
+  if (normalizedMode === 'nue-micro-foncier') {
+    addReco('tax-nue-reel', 'Basculer Micro-foncier -> Reel foncier', 'Med', 'Si charges et interets eleves', 'Reel foncier', { ...inputs }, { ...settings, taxMode: 'nue-reel-foncier' });
+  }
 
   if (baseResults.monthlyCashflow < 0) {
     const rentReco = buildNeutralCashflowRentReco(inputs, baseResults.monthlyCashflow);
@@ -609,13 +617,17 @@ function buildNeutralCashflowPriceReco(inputs) {
 }
 
 function renderProTax(fiscal, results) {
+  const modeLabel = getTaxModeLabel(fiscal.mode);
   proPaneTax.innerHTML = `
     <div class="pro-metrics">
+      <article><h3>Regime fiscal</h3><p>${escapeHtml(modeLabel)}</p></article>
       <article><h3>NOI annuel</h3><p>${formatCurrency(results.noiAnnual)}</p></article>
       <article><h3>Debt Service annuel</h3><p>${formatCurrency(results.annualDebtService)}</p></article>
       <article><h3>DSCR</h3><p>${results.dscr.toFixed(2)}</p></article>
       <article><h3>LTV</h3><p>${formatPercent(results.ltv * 100)}</p></article>
       <article><h3>Cash-on-cash</h3><p>${results.cashOnCash === null ? 'N/A' : formatPercent(results.cashOnCash)}</p></article>
+      <article><h3>Base imposable estimee</h3><p>${formatCurrency(fiscal.selectedTaxableBase)}</p></article>
+      <article><h3>Impot annuel estime</h3><p>${formatCurrency(fiscal.selectedTax)}</p></article>
       <article><h3>Cashflow annuel apres impot</h3><p>${formatCurrency(fiscal.annualCashflowAfterTax)}</p></article>
     </div>
   `;
@@ -951,9 +963,7 @@ function prepareProPrintReport() {
   const { settings, score, recommendations, fiscal, projection, results } = lastProAnalysis;
   const chartDataUrl = proChart ? proChart.toDataURL('image/png') : '';
   const projectionRows = (projection?.rows || []).slice(0, 10);
-  const taxModeLabel = settings.taxMode === 'real'
-    ? 'Reel simplifie'
-    : (settings.taxMode === 'bare' ? 'Location vide' : 'Micro-BIC');
+  const taxModeLabel = getTaxModeLabel(settings.taxMode);
   const scoreLines = [
     ['Cashflow & resilience', score.cashflowPts, 30],
     ['Rendement & revenus', score.yieldPts, 20],
@@ -965,7 +975,7 @@ function prepareProPrintReport() {
 
   proPrintReport.innerHTML = `
     <h3>Rapport Pro - Analyse avancee</h3>
-    <p>Plan Pro (59 EUR) | Regime fiscal: ${escapeHtml(settings.taxMode)} | Horizon: ${settings.projectionYears} ans</p>
+    <p>Plan Pro (59 EUR) | Regime fiscal: ${escapeHtml(taxModeLabel)} | Horizon: ${settings.projectionYears} ans</p>
 
     <h4>Rentium Score</h4>
     <p><strong>${Math.round(score.total)}/100 - ${score.label}</strong></p>
@@ -1058,7 +1068,7 @@ function hydrateFromQuery() {
   }
 
   if (params.get('plan')) planSelect.value = params.get('plan');
-  if (params.get('taxMode')) taxMode.value = params.get('taxMode');
+  if (params.get('taxMode')) taxMode.value = normalizeTaxMode(params.get('taxMode'));
   if (params.get('marginalTaxRate')) marginalTaxRate.value = params.get('marginalTaxRate');
   if (params.get('socialTaxRate')) socialTaxRate.value = params.get('socialTaxRate');
   if (params.get('annualDepreciation')) annualDepreciation.value = params.get('annualDepreciation');
@@ -1499,6 +1509,24 @@ function formatSignedCurrency(value) {
 
 function formatSignedNumber(value) {
   return `${value >= 0 ? '+' : ''}${Number(value || 0).toFixed(1)}`;
+}
+
+function normalizeTaxMode(rawMode) {
+  const mode = String(rawMode || '').trim();
+  if (mode === 'micro') return 'lmnp-micro';
+  if (mode === 'real') return 'lmnp-real';
+  if (mode === 'bare') return 'nue-reel-foncier';
+
+  const allowed = new Set(['lmnp-micro', 'lmnp-real', 'nue-micro-foncier', 'nue-reel-foncier']);
+  return allowed.has(mode) ? mode : 'lmnp-micro';
+}
+
+function getTaxModeLabel(rawMode) {
+  const mode = normalizeTaxMode(rawMode);
+  if (mode === 'lmnp-micro') return 'LMNP Micro-BIC';
+  if (mode === 'lmnp-real') return 'LMNP Reel';
+  if (mode === 'nue-micro-foncier') return 'Location nue Micro-foncier';
+  return 'Location nue Reel foncier';
 }
 
 function escapeHtml(input) {
