@@ -771,10 +771,29 @@ function renderProScore(score, recommendations, results) {
     : '<p class="empty">Aucune recommandation differenciante.</p>';
 
   const diag = score.total >= 70 ? 'Ca respire' : (score.total >= 55 ? 'Profil limite' : 'Profil risque');
+  const riskLabel = score.total >= 70 ? 'Sain' : (score.total >= 50 ? 'A surveiller' : 'Risque eleve');
+  const toneClass = scoreToneClass(score.total);
+  const scoreProgress = clamp(score.total, 0, 100);
 
   proPaneScore.innerHTML = `
-    <div class="score-head"><div class="score-circle">${Math.round(score.total)}<small>/100</small></div><div><h3>Rentium Score: ${score.label}</h3><p class="pro-hint">Diagnostic: ${diag}</p><p class="pro-hint">Cashflow: ${formatCurrency(results.monthlyCashflow)} / mois | DSCR: ${results.dscr.toFixed(2)} | LTV: ${formatPercent(results.ltv * 100)}</p></div></div>
-    <div class="score-grid">${lines.map(([l, p, c]) => `<article><h4>${l}</h4><p>${Number(p).toFixed(1)} / ${c}</p></article>`).join('')}</div>
+    <div class="score-head">
+      <div class="score-circle ${toneClass}">${Math.round(score.total)}<small>/100</small></div>
+      <div>
+        <h3>Rentium Score: ${score.label}</h3>
+        <p class="risk-pill ${toneClass}">${riskLabel}</p>
+        <p class="pro-hint">Diagnostic: ${diag}</p>
+        <p class="pro-hint">Cashflow: ${formatCurrency(results.monthlyCashflow)} / mois | DSCR: ${results.dscr.toFixed(2)} | LTV: ${formatPercent(results.ltv * 100)}</p>
+      </div>
+    </div>
+    <div class="score-progress-wrap">
+      <div class="score-progress-bar ${toneClass}" style="width:${scoreProgress}%;"></div>
+    </div>
+    <div class="score-grid">${lines.map(([l, p, c]) => {
+      const ratio = c > 0 ? (Number(p) / Number(c)) : 0;
+      const componentTone = componentToneClass(ratio);
+      const width = clamp(ratio * 100, 0, 100);
+      return `<article><h4>${l}</h4><p>${Number(p).toFixed(1)} / ${c}</p><div class="component-bar-wrap"><div class="component-bar ${componentTone}" style="width:${width}%;"></div></div></article>`;
+    }).join('')}</div>
     <p class="pro-hint">Hypotheses stress tests: Vacance +5 pts, Taux +1.00 pt.</p>
     <div class="reco-list">${recos}</div>
   `;
@@ -1715,6 +1734,20 @@ function getTaxModeLabel(rawMode) {
   if (mode === 'lmnp-real') return 'LMNP Reel';
   if (mode === 'nue-micro-foncier') return 'Location nue Micro-foncier';
   return 'Location nue Reel foncier';
+}
+
+function scoreToneClass(scoreValue) {
+  const score = Number(scoreValue || 0);
+  if (score >= 70) return 'tone-green';
+  if (score >= 50) return 'tone-orange';
+  return 'tone-red';
+}
+
+function componentToneClass(ratioValue) {
+  const ratio = Number(ratioValue || 0);
+  if (ratio >= 0.75) return 'tone-green';
+  if (ratio >= 0.45) return 'tone-orange';
+  return 'tone-red';
 }
 
 function escapeHtml(input) {

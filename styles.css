@@ -618,6 +618,30 @@ body.modal-open {
   color: var(--champagne-strong);
 }
 
+.tone-red {
+  color: #ff8f8f;
+}
+
+.tone-orange {
+  color: #f8c17a;
+}
+
+.tone-green {
+  color: #7fd49b;
+}
+
+.score-circle.tone-red {
+  border-color: #d86a6a;
+}
+
+.score-circle.tone-orange {
+  border-color: #d6b37a;
+}
+
+.score-circle.tone-green {
+  border-color: #7bcf9a;
+}
+
 .score-circle small {
   font-size: 0.72rem;
   color: var(--muted);
@@ -627,6 +651,57 @@ body.modal-open {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.risk-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.score-progress-wrap {
+  height: 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #17140f;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.score-progress-bar,
+.component-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 220ms ease;
+}
+
+.score-progress-bar.tone-red,
+.component-bar.tone-red {
+  background: linear-gradient(90deg, #b94a4a, #d86a6a);
+}
+
+.score-progress-bar.tone-orange,
+.component-bar.tone-orange {
+  background: linear-gradient(90deg, #bf7f35, #d6b37a);
+}
+
+.score-progress-bar.tone-green,
+.component-bar.tone-green {
+  background: linear-gradient(90deg, #4e9f71, #7bcf9a);
+}
+
+.component-bar-wrap {
+  height: 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #14110d;
+  margin-top: 8px;
+  overflow: hidden;
 }
 
 .score-grid article,

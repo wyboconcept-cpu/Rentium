@@ -363,6 +363,31 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 }));
 
 app.use(express.json());
+
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').send([
+    'User-agent: *',
+    'Allow: /',
+    `Sitemap: ${appUrl}/sitemap.xml`
+  ].join('\n'));
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  const now = new Date().toISOString();
+  const urls = [
+    `${appUrl}/`,
+    `${appUrl}/index.html`,
+    `${appUrl}/payment.html`
+  ];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map((url) => `  <url><loc>${url}</loc><lastmod>${now}</lastmod></url>`).join('\n')}
+</urlset>`;
+
+  res.type('application/xml').send(xml);
+});
+
 app.use(express.static(process.cwd()));
 
 app.get('/api/health', asyncHandler(async (_req, res) => {
