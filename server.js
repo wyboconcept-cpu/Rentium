@@ -377,7 +377,10 @@ app.get('/sitemap.xml', (_req, res) => {
   const urls = [
     `${appUrl}/`,
     `${appUrl}/index.html`,
-    `${appUrl}/payment.html`
+    `${appUrl}/payment.html`,
+    `${appUrl}/simulateur-rentabilite-locative.html`,
+    `${appUrl}/calcul-cashflow-immobilier.html`,
+    `${appUrl}/lmnp-micro-bic-vs-reel.html`
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
