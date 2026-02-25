@@ -43,6 +43,9 @@
   <header class="app-header">
     <h1>Rentium</h1>
     <p id="planTagline">Simulateur de rentabilite locative - Version Gratuit</p>
+    <p class="seo-intro">
+      Rentium est un simulateur immobilier pour estimer la rentabilite locative, le cashflow, le rendement net et la projection long terme d'un investissement.
+    </p>
     <div class="mode-switch">
       <span id="currentPlanBadge" class="current-plan-badge">Plan actif: Gratuit</span>
       <select id="planSelect" hidden aria-hidden="true">
@@ -112,10 +115,10 @@
 
     <section class="card results-card" id="printArea">
       <h2>Resultats instantanes</h2>
-      <div class="metrics" id="metrics"></div>
-      <div class="cashflow-banner" id="cashflowBanner"></div>
-      <div class="error-box" id="errorBox"></div>
-      <section id="proPrintReport" class="pro-print-report" aria-label="Rapport Pro PDF"></section>
+      <div class="metrics" id="metrics" data-nosnippet></div>
+      <div class="cashflow-banner" id="cashflowBanner" data-nosnippet></div>
+      <div class="error-box" id="errorBox" data-nosnippet></div>
+      <section id="proPrintReport" class="pro-print-report" aria-label="Rapport Pro PDF" data-nosnippet></section>
     </section>
 
     <section class="card scenarios-card">
