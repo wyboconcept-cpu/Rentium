@@ -366,7 +366,7 @@ function renderProAnalysis(inputs, results) {
   const settings = readProSettings();
   const fiscal = computeFiscalAnalysis(inputs, results, settings);
   const projection = computeProjection(inputs, results, settings);
-  const score = computeScore(inputs, results, settings, fiscal);
+  const score = computeScore(inputs, results, settings, fiscal, projection);
   const recommendations = generateRecommendations(inputs, settings, results, score);
 
   lastProAnalysis = { inputs, results, settings, fiscal, projection, score, recommendations };
@@ -475,11 +475,13 @@ function computeProjection(inputs, results, settings) {
   };
 }
 
-function computeScore(inputs, results, settings, fiscal) {
-  const cashflowPts = mapCashflowPoints(results.monthlyCashflow, inputs.monthlyRent);
+function computeScore(inputs, results, settings, fiscal, projection) {
+  const activeProjection = projection || computeProjection(inputs, results, settings);
+  const monthlyAfterTax = Number(fiscal?.annualCashflowAfterTax) / 12 || results.monthlyCashflow;
+  const cashflowPts = mapCashflowPoints(monthlyAfterTax, inputs.monthlyRent);
   const yieldPts = mapYieldPoints(results.netYield);
   const debtPts = mapDebtPoints(results.dscr, results.ltv);
-  const stress = mapStressPoints(inputs);
+  const stress = mapStressPoints(inputs, settings, results, activeProjection);
   const costPts = mapCostPoints(results.annualOperatingCharges, results.annualCollectedRent);
   const taxPts = mapTaxPoints(results, fiscal, settings);
 
@@ -491,8 +493,10 @@ function computeScore(inputs, results, settings, fiscal) {
     stressPts: stress.total,
     stressA: stress.a,
     stressB: stress.b,
+    stressLongTerm: stress.longTerm,
     costPts,
     taxPts,
+    monthlyAfterTax,
     total,
     label: scoreLabel(total)
   };
@@ -535,11 +539,36 @@ function mapDebtPoints(dscr, ltv) {
   return clamp(a + b, 0, 20);
 }
 
-function mapStressPoints(inputs) {
-  const cfa = computeResults({ ...inputs, vacancyRate: clamp(inputs.vacancyRate + 5, 0, 50) }).monthlyCashflow;
-  const cfb = computeResults({ ...inputs, interestRate: inputs.interestRate + 1 }).monthlyCashflow;
-  const pts = (v) => (v >= 0 ? 7.5 : (v <= -200 ? 0 : ((v + 200) / 200) * 7.5));
-  return { a: cfa, b: cfb, total: pts(cfa) + pts(cfb) };
+function mapStressPoints(inputs, settings, baseResults, projection) {
+  const shockVacancyInputs = { ...inputs, vacancyRate: clamp(inputs.vacancyRate + 5, 0, 50) };
+  const shockRateInputs = { ...inputs, interestRate: inputs.interestRate + 1 };
+
+  const shockVacancyResults = computeResults(shockVacancyInputs);
+  const shockRateResults = computeResults(shockRateInputs);
+
+  const shockVacancyFiscal = computeFiscalAnalysis(shockVacancyInputs, shockVacancyResults, settings);
+  const shockRateFiscal = computeFiscalAnalysis(shockRateInputs, shockRateResults, settings);
+
+  const cfa = shockVacancyFiscal.annualCashflowAfterTax / 12;
+  const cfb = shockRateFiscal.annualCashflowAfterTax / 12;
+
+  const shortPts = (v) => (v >= 0 ? 5 : (v <= -250 ? 0 : ((v + 250) / 250) * 5));
+
+  const avgMonthlyProjection = projection.horizon > 0
+    ? projection.totalCashflow / (projection.horizon * 12)
+    : 0;
+  const saleBonusMonthly = projection.horizon > 0
+    ? (projection.totalWithExit - baseResults.totalCost) / (projection.horizon * 12)
+    : 0;
+  const longSignal = (avgMonthlyProjection * 0.75) + (saleBonusMonthly * 0.25);
+
+  let longPts = 0;
+  if (longSignal >= 200) longPts = 5;
+  else if (longSignal >= 50) longPts = 4;
+  else if (longSignal >= 0) longPts = 3;
+  else if (longSignal >= -100) longPts = 1.5;
+
+  return { a: cfa, b: cfb, longTerm: longSignal, total: shortPts(cfa) + shortPts(cfb) + longPts };
 }
 
 function mapCostPoints(charges, rent) {
@@ -554,7 +583,24 @@ function mapCostPoints(charges, rent) {
 
 function mapTaxPoints(results, fiscal, settings) {
   if (settings.marginalTaxRate === null) return 3;
-  return (fiscal.annualCashflowAfterTax / 12) >= (results.monthlyCashflow - 20) ? 5 : 2;
+  const monthlyTaxDrag = Math.max(results.monthlyCashflow - (fiscal.annualCashflowAfterTax / 12), 0);
+  const bestTaxableBase = Math.min(
+    fiscal.taxableLmnpMicro,
+    fiscal.taxableLmnpReal,
+    fiscal.taxableNueMicroFoncier,
+    fiscal.taxableNueReelFoncier
+  );
+  const bestAnnualTax = bestTaxableBase * fiscal.taxRate;
+  const optimizationGap = Math.max(fiscal.selectedTax - bestAnnualTax, 0);
+
+  let pts = 1;
+  if (monthlyTaxDrag <= 50) pts = 3;
+  else if (monthlyTaxDrag <= 120) pts = 2;
+
+  if (optimizationGap <= 200) pts += 2;
+  else if (optimizationGap <= 800) pts += 1;
+
+  return clamp(pts, 0, 5);
 }
 
 function scoreLabel(score) {
@@ -570,7 +616,8 @@ function generateRecommendations(inputs, settings, baseResults, baseScore) {
   const addReco = (id, title, effort, assumptions, targetValue, nextInput, nextSettings = settings) => {
     const r = computeResults(nextInput);
     const f = computeFiscalAnalysis(nextInput, r, nextSettings);
-    const s = computeScore(nextInput, r, nextSettings, f);
+    const p = computeProjection(nextInput, r, nextSettings);
+    const s = computeScore(nextInput, r, nextSettings, f, p);
     recos.push({
       id,
       title,
@@ -782,7 +829,7 @@ function renderProScore(score, recommendations, results) {
         <h3>Rentium Score: ${score.label}</h3>
         <p class="risk-pill ${toneClass}">${riskLabel}</p>
         <p class="pro-hint">Diagnostic: ${diag}</p>
-        <p class="pro-hint">Cashflow: ${formatCurrency(results.monthlyCashflow)} / mois | DSCR: ${results.dscr.toFixed(2)} | LTV: ${formatPercent(results.ltv * 100)}</p>
+        <p class="pro-hint">Cashflow apres impot: ${formatCurrency(score.monthlyAfterTax)} / mois | DSCR: ${results.dscr.toFixed(2)} | LTV: ${formatPercent(results.ltv * 100)}</p>
       </div>
     </div>
     <div class="score-progress-wrap">
