@@ -72,7 +72,19 @@ body {
   color: var(--muted);
 }
 
+.seo-intro {
+  grid-column: 1;
+}
+
+#planTagline {
+  grid-column: 2;
+  justify-self: end;
+  text-align: right;
+}
+
 .mode-switch {
+  grid-column: 1;
+  justify-self: start;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -796,6 +808,12 @@ body.modal-open {
 
   .app-header {
     grid-template-columns: 1fr;
+  }
+
+  #planTagline {
+    grid-column: auto;
+    justify-self: start;
+    text-align: left;
   }
 
   .auth-bar input {
