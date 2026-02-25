@@ -9,6 +9,8 @@
   --success: #7bcf9a;
   --border: #3a3127;
   --card-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+  --link: #ff6f3d;
+  --link-hover: #ff8a57;
 }
 
 * {
@@ -164,6 +166,16 @@ body {
 
 h2, h3 {
   margin-top: 0;
+}
+
+a,
+a:visited {
+  color: var(--link);
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--link-hover);
 }
 
 .grid-form {
