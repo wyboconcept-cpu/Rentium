@@ -380,7 +380,12 @@ app.get('/sitemap.xml', (_req, res) => {
     `${appUrl}/payment.html`,
     `${appUrl}/simulateur-rentabilite-locative.html`,
     `${appUrl}/calcul-cashflow-immobilier.html`,
-    `${appUrl}/lmnp-micro-bic-vs-reel.html`
+    `${appUrl}/lmnp-micro-bic-vs-reel.html`,
+    `${appUrl}/calcul-rentabilite-locative-nette.html`,
+    `${appUrl}/investissement-locatif-cashflow-positif.html`,
+    `${appUrl}/simulation-lmnp-amortissement.html`,
+    `${appUrl}/taux-credit-investissement-locatif.html`,
+    `${appUrl}/vacance-locative-comment-estimer.html`
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
