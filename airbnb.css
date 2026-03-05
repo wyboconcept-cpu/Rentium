@@ -103,6 +103,43 @@ input {
   color: var(--text);
 }
 
+.fiscal-select {
+  width: 100%;
+  border: 1px solid #35515c;
+  border-radius: 12px;
+  padding: 11px 42px 11px 12px;
+  background-color: #0f171c;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #8cc0ce 50%),
+    linear-gradient(135deg, #8cc0ce 50%, transparent 50%),
+    linear-gradient(90deg, rgba(53, 81, 92, 0.95), rgba(53, 81, 92, 0.95));
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 14px) calc(50% - 2px),
+    calc(100% - 34px) 50%;
+  background-size: 6px 6px, 6px 6px, 1px 22px;
+  background-repeat: no-repeat;
+}
+
+.fiscal-select:hover {
+  border-color: #4f7e8c;
+}
+
+.fiscal-select:focus {
+  outline: none;
+  border-color: #59a8bb;
+  box-shadow: 0 0 0 3px rgba(89, 168, 187, 0.18), 0 10px 24px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+
 .status {
   margin: 8px 0 0;
   color: var(--muted);
