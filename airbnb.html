@@ -21,7 +21,7 @@
       <h1>Simulateur Airbnb</h1>
       <p class="subtitle">Moteur de calcul dedie a la location courte duree pour les plans Essentiel et Pro.</p>
       <div class="hero-links">
-        <a class="ghost" href="/index.html">Retour simulateur locatif classique</a>
+        <a class="ghost back-link" href="/index.html">Retour simulateur locatif classique</a>
         <button id="openPricingBtn" class="cta" type="button">Voir les plans</button>
       </div>
     </header>
@@ -66,11 +66,16 @@
           <label>Amortissement mobilier / an<input name="annualFurnitureAmortization" type="number" min="0" step="100" value="1900" required></label>
           <label>TMI (%)<input name="marginalTaxRate" type="number" min="0" max="45" step="1" value="30" required></label>
           <label>Prelevements sociaux (%)<input name="socialTaxRate" type="number" min="0" max="30" step="0.1" value="17.2" required></label>
+          <label>Cotisations sociales LMP (%)<input name="lmpSocialRate" type="number" min="0" max="60" step="0.1" value="35" required></label>
+          <label>IS societe (%)<input name="corporateTaxRate" type="number" min="0" max="40" step="0.1" value="25" required></label>
           <label>Regime fiscal prefere
             <select name="fiscalMode">
               <option value="auto" selected>Auto (meilleur net)</option>
-              <option value="micro-bic">LMNP Micro-BIC</option>
+              <option value="lmnp-micro">LMNP Micro-BIC</option>
               <option value="lmnp-reel">LMNP Reel</option>
+              <option value="lmp-micro">LMP Micro-BIC</option>
+              <option value="lmp-reel">LMP Reel</option>
+              <option value="sci-is">Societe (IS)</option>
             </select>
           </label>
         </form>

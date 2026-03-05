@@ -53,11 +53,13 @@ function readInputs() {
   const data = {};
   for (const [k, v] of fd.entries()) data[k] = Number(v || 0);
 
-  data.fiscalMode = String(fd.get('fiscalMode') || 'auto');
+  data.fiscalMode = normalizeFiscalMode(fd.get('fiscalMode'));
   data.occupancyRate = clamp(data.occupancyRate, 0, 100);
   data.openDays = clamp(data.openDays, 1, 365);
   data.socialTaxRate = clamp(data.socialTaxRate, 0, 30);
   data.marginalTaxRate = clamp(data.marginalTaxRate, 0, 45);
+  data.lmpSocialRate = clamp(data.lmpSocialRate, 0, 60);
+  data.corporateTaxRate = clamp(data.corporateTaxRate, 0, 40);
   return data;
 }
 
@@ -130,52 +132,80 @@ function computeBaseAirbnb(data, mod = { uplift: 0, seasonality: 1, cityTax: 0 }
 
 function computeFiscalComparison(data, base, carryForwardReel = 0) {
   const taxRate = (data.marginalTaxRate + data.socialTaxRate) / 100;
-
-  const microTaxable = Math.max(base.grossRevenue * 0.5, 0);
-  const microTax = microTaxable * taxRate;
-  const microNetAfterTax = base.annualNetBeforeTax - microTax;
-
+  const lmpRate = (data.marginalTaxRate + data.lmpSocialRate) / 100;
+  const corpRate = data.corporateTaxRate / 100;
   const amortization = data.annualBuildingAmortization + data.annualFurnitureAmortization;
-  const reelRawTaxable = base.grossRevenue
+  
+  const lmnpMicroTaxable = Math.max(base.grossRevenue * 0.5, 0);
+  const lmnpMicroTax = lmnpMicroTaxable * taxRate;
+  const lmnpMicroNetAfterTax = base.annualNetBeforeTax - lmnpMicroTax;
+
+  const lmnpReelRawTaxable = base.grossRevenue
     - base.operatingCashCosts
     - base.annualInterest
     - base.annualLoanInsurance
     - amortization;
-  const reelAfterCarry = reelRawTaxable - carryForwardReel;
-  const reelTaxable = Math.max(reelAfterCarry, 0);
-  const nextCarryForward = reelAfterCarry < 0 ? Math.abs(reelAfterCarry) : 0;
-  const reelTax = reelTaxable * taxRate;
-  const reelNetAfterTax = base.annualNetBeforeTax - reelTax;
+  const lmnpReelAfterCarry = lmnpReelRawTaxable - carryForwardReel;
+  const lmnpReelTaxable = Math.max(lmnpReelAfterCarry, 0);
+  const lmnpReelCarryForwardNext = lmnpReelAfterCarry < 0 ? Math.abs(lmnpReelAfterCarry) : 0;
+  const lmnpReelTax = lmnpReelTaxable * taxRate;
+  const lmnpReelNetAfterTax = base.annualNetBeforeTax - lmnpReelTax;
 
-  const preferred = data.fiscalMode === 'micro-bic'
-    ? 'micro-bic'
-    : (data.fiscalMode === 'lmnp-reel'
-      ? 'lmnp-reel'
-      : (reelNetAfterTax >= microNetAfterTax ? 'lmnp-reel' : 'micro-bic'));
+  const lmpMicroTaxable = Math.max(base.grossRevenue * 0.5, 0);
+  const lmpMicroTax = lmpMicroTaxable * lmpRate;
+  const lmpMicroNetAfterTax = base.annualNetBeforeTax - lmpMicroTax;
 
-  const selectedTax = preferred === 'lmnp-reel' ? reelTax : microTax;
-  const selectedNetAfterTax = preferred === 'lmnp-reel' ? reelNetAfterTax : microNetAfterTax;
+  const lmpReelRawTaxable = base.grossRevenue
+    - base.operatingCashCosts
+    - base.annualInterest
+    - base.annualLoanInsurance
+    - amortization;
+  const lmpReelTaxable = Math.max(lmpReelRawTaxable, 0);
+  const lmpReelTax = lmpReelTaxable * lmpRate;
+  const lmpReelNetAfterTax = base.annualNetBeforeTax - lmpReelTax;
+
+  const sciIsRawTaxable = base.grossRevenue
+    - base.operatingCashCosts
+    - base.annualInterest
+    - base.annualLoanInsurance
+    - amortization;
+  const sciIsTaxable = Math.max(sciIsRawTaxable, 0);
+  const sciIsTax = sciIsTaxable * corpRate;
+  const sciIsNetAfterTax = base.annualNetBeforeTax - sciIsTax;
+
+  const regimes = {
+    'lmnp-micro': { taxable: lmnpMicroTaxable, tax: lmnpMicroTax, netAfterTax: lmnpMicroNetAfterTax },
+    'lmnp-reel': {
+      taxable: lmnpReelTaxable,
+      rawTaxable: lmnpReelRawTaxable,
+      tax: lmnpReelTax,
+      netAfterTax: lmnpReelNetAfterTax,
+      carryForwardUsed: carryForwardReel,
+      carryForwardNext: lmnpReelCarryForwardNext
+    },
+    'lmp-micro': { taxable: lmpMicroTaxable, tax: lmpMicroTax, netAfterTax: lmpMicroNetAfterTax },
+    'lmp-reel': { taxable: lmpReelTaxable, rawTaxable: lmpReelRawTaxable, tax: lmpReelTax, netAfterTax: lmpReelNetAfterTax },
+    'sci-is': { taxable: sciIsTaxable, rawTaxable: sciIsRawTaxable, tax: sciIsTax, netAfterTax: sciIsNetAfterTax }
+  };
+
+  const preferred = data.fiscalMode === 'auto'
+    ? Object.entries(regimes).sort((a, b) => b[1].netAfterTax - a[1].netAfterTax)[0][0]
+    : data.fiscalMode;
+
+  const selectedTax = regimes[preferred].tax;
+  const selectedNetAfterTax = regimes[preferred].netAfterTax;
 
   return {
-    micro: { taxable: microTaxable, tax: microTax, netAfterTax: microNetAfterTax },
-    reel: {
-      taxable: reelTaxable,
-      rawTaxable: reelRawTaxable,
-      tax: reelTax,
-      netAfterTax: reelNetAfterTax,
-      carryForwardUsed: carryForwardReel,
-      carryForwardNext: nextCarryForward
-    },
+    regimes,
     selectedMode: preferred,
     selectedTax,
-    selectedNetAfterTax
+    selectedNetAfterTax,
+    carryForwardNext: lmnpReelCarryForwardNext
   };
 }
 
 function computeProjection(data, base, controls) {
-  const taxRate = (data.marginalTaxRate + data.socialTaxRate) / 100;
   const rows = [];
-  const amortization = data.annualBuildingAmortization + data.annualFurnitureAmortization;
   let carryForwardReel = 0;
   let cumulative = 0;
 
@@ -191,25 +221,22 @@ function computeProjection(data, base, controls) {
     const operatingCashCosts = base.operatingCashCosts * growthCostFactor;
     const annualNetBeforeTax = grossRevenue - operatingCashCosts - debt;
 
-    const microTaxable = Math.max(grossRevenue * 0.5, 0);
-    const microTax = microTaxable * taxRate;
-    const microNetAfterTax = annualNetBeforeTax - microTax;
+    const yearBase = {
+      ...base,
+      grossRevenue,
+      operatingCashCosts,
+      annualInterest: interest,
+      annualLoanInsurance: base.annualLoanInsurance,
+      annualNetBeforeTax,
+      annualRoomRevenue: base.annualRoomRevenue * growthRevenueFactor,
+      annualCleaningRevenue: base.annualCleaningRevenue * growthRevenueFactor
+    };
+    const yearFiscal = computeFiscalComparison(data, yearBase, carryForwardReel);
+    const selectedMode = yearFiscal.selectedMode;
+    const selectedTax = yearFiscal.selectedTax;
+    const selectedNetAfterTax = yearFiscal.selectedNetAfterTax;
 
-    const reelRawTaxable = grossRevenue - operatingCashCosts - interest - base.annualLoanInsurance - amortization;
-    const reelAfterCarry = reelRawTaxable - carryForwardReel;
-    const reelTaxable = Math.max(reelAfterCarry, 0);
-    const reelTax = reelTaxable * taxRate;
-    const reelNetAfterTax = annualNetBeforeTax - reelTax;
-
-    const selectedMode = data.fiscalMode === 'micro-bic'
-      ? 'micro-bic'
-      : (data.fiscalMode === 'lmnp-reel'
-        ? 'lmnp-reel'
-        : (reelNetAfterTax >= microNetAfterTax ? 'lmnp-reel' : 'micro-bic'));
-    const selectedTax = selectedMode === 'lmnp-reel' ? reelTax : microTax;
-    const selectedNetAfterTax = selectedMode === 'lmnp-reel' ? reelNetAfterTax : microNetAfterTax;
-
-    carryForwardReel = reelAfterCarry < 0 ? Math.abs(reelAfterCarry) : 0;
+    carryForwardReel = yearFiscal.carryForwardNext || 0;
     cumulative += selectedNetAfterTax;
 
     rows.push({
@@ -278,8 +305,11 @@ function render() {
   renderMetric('Nuits louees / an', `${Math.round(base.nightsBooked)} nuits`);
 
   fiscalArea.hidden = false;
-  renderCompareCard('LMNP Micro-BIC', fiscal.micro.taxable, fiscal.micro.tax, fiscal.micro.netAfterTax, fiscal.selectedMode === 'micro-bic');
-  renderCompareCard('LMNP Reel', fiscal.reel.taxable, fiscal.reel.tax, fiscal.reel.netAfterTax, fiscal.selectedMode === 'lmnp-reel');
+  ['lmnp-micro', 'lmnp-reel', 'lmp-micro', 'lmp-reel', 'sci-is'].forEach((key) => {
+    const item = fiscal.regimes[key];
+    if (!item) return;
+    renderCompareCard(modeLabel(key), item.taxable, item.tax, item.netAfterTax, fiscal.selectedMode === key);
+  });
 
   if (!hasPro) return;
 
@@ -537,7 +567,20 @@ function labelPlan(plan) {
 }
 
 function modeLabel(mode) {
-  return mode === 'lmnp-reel' ? 'LMNP Reel' : 'LMNP Micro-BIC';
+  if (mode === 'lmnp-micro') return 'LMNP Micro-BIC';
+  if (mode === 'lmnp-reel') return 'LMNP Reel';
+  if (mode === 'lmp-micro') return 'LMP Micro-BIC';
+  if (mode === 'lmp-reel') return 'LMP Reel';
+  if (mode === 'sci-is') return 'Societe (IS)';
+  return 'Regime';
+}
+
+function normalizeFiscalMode(mode) {
+  const raw = String(mode || '').trim();
+  const allowed = new Set(['auto', 'lmnp-micro', 'lmnp-reel', 'lmp-micro', 'lmp-reel', 'sci-is']);
+  if (allowed.has(raw)) return raw;
+  if (raw === 'micro-bic') return 'lmnp-micro';
+  return 'auto';
 }
 
 function clamp(value, min, max) {
