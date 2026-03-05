@@ -7,14 +7,22 @@ const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const authState = document.getElementById('authState');
 const planState = document.getElementById('planState');
+
 const form = document.getElementById('airbnbForm');
 const metrics = document.getElementById('metrics');
+const fiscalArea = document.getElementById('fiscalArea');
+const fiscalCompare = document.getElementById('fiscalCompare');
 const proMetrics = document.getElementById('proMetrics');
 const proArea = document.getElementById('proArea');
 const lockNotice = document.getElementById('lockNotice');
+const projectionBody = document.getElementById('projectionBody');
+
 const dynamicPricingUplift = document.getElementById('dynamicPricingUplift');
 const seasonalityIndex = document.getElementById('seasonalityIndex');
 const cityTaxRate = document.getElementById('cityTaxRate');
+const projectionYears = document.getElementById('projectionYears');
+const annualRevenueGrowth = document.getElementById('annualRevenueGrowth');
+const annualCostGrowth = document.getElementById('annualCostGrowth');
 
 let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
 let currentUser = null;
@@ -24,7 +32,8 @@ init();
 
 function init() {
   form.addEventListener('input', render);
-  [dynamicPricingUplift, seasonalityIndex, cityTaxRate].forEach((el) => el && el.addEventListener('input', render));
+  [dynamicPricingUplift, seasonalityIndex, cityTaxRate, projectionYears, annualRevenueGrowth, annualCostGrowth]
+    .forEach((el) => el && el.addEventListener('input', render));
   registerBtn.addEventListener('click', registerAccount);
   loginBtn.addEventListener('click', loginAccount);
   logoutBtn.addEventListener('click', logoutAccount);
@@ -35,126 +44,259 @@ function readInputs() {
   const fd = new FormData(form);
   const data = {};
   for (const [k, v] of fd.entries()) data[k] = Number(v || 0);
+
+  data.fiscalMode = String(fd.get('fiscalMode') || 'auto');
   data.occupancyRate = clamp(data.occupancyRate, 0, 100);
   data.openDays = clamp(data.openDays, 1, 365);
+  data.socialTaxRate = clamp(data.socialTaxRate, 0, 30);
+  data.marginalTaxRate = clamp(data.marginalTaxRate, 0, 45);
   return data;
 }
 
-function computeAirbnb(data) {
+function readProControls() {
+  return {
+    uplift: Number(dynamicPricingUplift?.value || 0) / 100,
+    seasonality: clamp(Number(seasonalityIndex?.value || 1), 0.6, 1.4),
+    cityTax: clamp(Number(cityTaxRate?.value || 0), 0, 20) / 100,
+    years: clamp(Number(projectionYears?.value || 10), 3, 20),
+    revenueGrowth: Number(annualRevenueGrowth?.value || 0) / 100,
+    costGrowth: Number(annualCostGrowth?.value || 0) / 100
+  };
+}
+
+function computeBaseAirbnb(data, mod = { uplift: 0, seasonality: 1, cityTax: 0 }) {
   const loanAmount = Math.max(data.purchasePrice - data.downPayment, 0);
-  const months = Math.max(data.loanYears * 12, 1);
-  const monthlyRate = data.interestRate / 100 / 12;
-  const monthlyPayment = monthlyRate === 0
-    ? loanAmount / months
-    : (loanAmount * monthlyRate) / (1 - (1 + monthlyRate) ** -months);
+  const schedule = generateLoanSchedule(loanAmount, data.interestRate, data.loanYears);
+  const firstYear = schedule[0] || { payment: 0, interest: 0, balance: loanAmount };
+
+  const monthlyPayment = firstYear.payment / 12;
+  const annualLoanInsurance = loanAmount * (data.insuranceRate / 100);
+  const debtAnnual = firstYear.payment + annualLoanInsurance;
 
   const nightsBooked = data.openDays * (data.occupancyRate / 100);
-  const annualRoomRevenue = nightsBooked * data.nightlyRate;
+  const roomRevenueBase = nightsBooked * data.nightlyRate;
+  const annualRoomRevenue = roomRevenueBase * (1 + mod.uplift) * mod.seasonality;
   const annualCleaningRevenue = data.turnoversPerMonth * 12 * data.cleaningFeeCharged;
   const grossRevenue = annualRoomRevenue + annualCleaningRevenue;
 
   const platformFees = grossRevenue * (data.platformFeeRate / 100);
   const conciergeFees = annualRoomRevenue * (data.conciergeRate / 100);
   const consumables = data.turnoversPerMonth * 12 * data.suppliesPerTurnover;
-  const debtAnnual = monthlyPayment * 12 + ((loanAmount * data.insuranceRate / 100));
-  const operatingCosts = (data.fixedMonthlyCosts * 12) + consumables + data.propertyTax + data.annualInsuranceFixed + platformFees + conciergeFees;
-  const annualNet = grossRevenue - operatingCosts - debtAnnual;
+  const cityTaxAnnual = annualRoomRevenue * mod.cityTax;
+
+  const operatingCashCosts = (data.fixedMonthlyCosts * 12)
+    + consumables
+    + data.propertyTax
+    + data.annualInsuranceFixed
+    + data.annualCfe
+    + data.annualAccountingFees
+    + data.annualDeductibleWorks
+    + platformFees
+    + conciergeFees
+    + cityTaxAnnual;
+
+  const annualNetBeforeTax = grossRevenue - operatingCashCosts - debtAnnual;
+  const netMargin = grossRevenue > 0 ? (annualNetBeforeTax / grossRevenue) * 100 : 0;
 
   return {
     loanAmount,
+    schedule,
     monthlyPayment,
+    annualLoanInsurance,
     nightsBooked,
     annualRoomRevenue,
     annualCleaningRevenue,
     grossRevenue,
     platformFees,
     conciergeFees,
-    operatingCosts,
+    consumables,
+    cityTaxAnnual,
+    operatingCashCosts,
     debtAnnual,
-    annualNet,
-    monthlyNet: annualNet / 12,
-    netMargin: grossRevenue > 0 ? (annualNet / grossRevenue) * 100 : 0
+    annualInterest: firstYear.interest,
+    annualNetBeforeTax,
+    monthlyNetBeforeTax: annualNetBeforeTax / 12,
+    netMargin
   };
 }
 
-function computePro(base, data) {
-  const uplift = Number(dynamicPricingUplift.value || 0) / 100;
-  const season = Number(seasonalityIndex.value || 1);
-  const cityTax = Number(cityTaxRate.value || 0) / 100;
+function computeFiscalComparison(data, base, carryForwardReel = 0) {
+  const taxRate = (data.marginalTaxRate + data.socialTaxRate) / 100;
 
-  const adjustedRoomRevenue = base.annualRoomRevenue * (1 + uplift) * season;
-  const adjustedGross = adjustedRoomRevenue + base.annualCleaningRevenue;
-  const adjustedPlatform = adjustedGross * (data.platformFeeRate / 100);
-  const adjustedConcierge = adjustedRoomRevenue * (data.conciergeRate / 100);
-  const cityTaxAnnual = adjustedRoomRevenue * cityTax;
-  const adjustedOperating = (data.fixedMonthlyCosts * 12)
-    + (data.turnoversPerMonth * 12 * data.suppliesPerTurnover)
-    + data.propertyTax
-    + data.annualInsuranceFixed
-    + adjustedPlatform
-    + adjustedConcierge
-    + cityTaxAnnual;
+  const microTaxable = Math.max(base.grossRevenue * 0.5, 0);
+  const microTax = microTaxable * taxRate;
+  const microNetAfterTax = base.annualNetBeforeTax - microTax;
 
-  const proAnnualNet = adjustedGross - adjustedOperating - base.debtAnnual;
+  const amortization = data.annualBuildingAmortization + data.annualFurnitureAmortization;
+  const reelRawTaxable = base.grossRevenue
+    - base.operatingCashCosts
+    - base.annualInterest
+    - base.annualLoanInsurance
+    - amortization;
+  const reelAfterCarry = reelRawTaxable - carryForwardReel;
+  const reelTaxable = Math.max(reelAfterCarry, 0);
+  const nextCarryForward = reelAfterCarry < 0 ? Math.abs(reelAfterCarry) : 0;
+  const reelTax = reelTaxable * taxRate;
+  const reelNetAfterTax = base.annualNetBeforeTax - reelTax;
 
-  const stressOcc = computeAirbnb({ ...data, occupancyRate: clamp(data.occupancyRate - 10, 0, 100) }).monthlyNet;
-  const stressAdr = computeAirbnb({ ...data, nightlyRate: data.nightlyRate * 0.85 }).monthlyNet;
-  const score = computeProScore(proAnnualNet / 12, stressOcc, stressAdr);
+  const preferred = data.fiscalMode === 'micro-bic'
+    ? 'micro-bic'
+    : (data.fiscalMode === 'lmnp-reel'
+      ? 'lmnp-reel'
+      : (reelNetAfterTax >= microNetAfterTax ? 'lmnp-reel' : 'micro-bic'));
+
+  const selectedTax = preferred === 'lmnp-reel' ? reelTax : microTax;
+  const selectedNetAfterTax = preferred === 'lmnp-reel' ? reelNetAfterTax : microNetAfterTax;
 
   return {
-    adjustedGross,
-    cityTaxAnnual,
-    proAnnualNet,
-    proMonthlyNet: proAnnualNet / 12,
-    stressOcc,
-    stressAdr,
-    score
+    micro: { taxable: microTaxable, tax: microTax, netAfterTax: microNetAfterTax },
+    reel: {
+      taxable: reelTaxable,
+      rawTaxable: reelRawTaxable,
+      tax: reelTax,
+      netAfterTax: reelNetAfterTax,
+      carryForwardUsed: carryForwardReel,
+      carryForwardNext: nextCarryForward
+    },
+    selectedMode: preferred,
+    selectedTax,
+    selectedNetAfterTax
   };
 }
 
-function computeProScore(monthlyNet, stressOcc, stressAdr) {
-  const base = monthlyNet >= 400 ? 45 : (monthlyNet >= 0 ? 32 : 12);
-  const occ = stressOcc >= 0 ? 30 : (stressOcc > -250 ? 18 : 6);
-  const adr = stressAdr >= 0 ? 25 : (stressAdr > -250 ? 15 : 5);
+function computeProjection(data, base, controls) {
+  const taxRate = (data.marginalTaxRate + data.socialTaxRate) / 100;
+  const rows = [];
+  const amortization = data.annualBuildingAmortization + data.annualFurnitureAmortization;
+  let carryForwardReel = 0;
+  let cumulative = 0;
+
+  for (let year = 1; year <= controls.years; year += 1) {
+    const growthRevenueFactor = (1 + controls.revenueGrowth) ** (year - 1);
+    const growthCostFactor = (1 + controls.costGrowth) ** (year - 1);
+    const debt = base.schedule[year - 1]
+      ? (base.schedule[year - 1].payment + base.annualLoanInsurance)
+      : 0;
+    const interest = base.schedule[year - 1] ? base.schedule[year - 1].interest : 0;
+
+    const grossRevenue = (base.annualRoomRevenue + base.annualCleaningRevenue) * growthRevenueFactor;
+    const operatingCashCosts = base.operatingCashCosts * growthCostFactor;
+    const annualNetBeforeTax = grossRevenue - operatingCashCosts - debt;
+
+    const microTaxable = Math.max(grossRevenue * 0.5, 0);
+    const microTax = microTaxable * taxRate;
+    const microNetAfterTax = annualNetBeforeTax - microTax;
+
+    const reelRawTaxable = grossRevenue - operatingCashCosts - interest - base.annualLoanInsurance - amortization;
+    const reelAfterCarry = reelRawTaxable - carryForwardReel;
+    const reelTaxable = Math.max(reelAfterCarry, 0);
+    const reelTax = reelTaxable * taxRate;
+    const reelNetAfterTax = annualNetBeforeTax - reelTax;
+
+    const selectedMode = data.fiscalMode === 'micro-bic'
+      ? 'micro-bic'
+      : (data.fiscalMode === 'lmnp-reel'
+        ? 'lmnp-reel'
+        : (reelNetAfterTax >= microNetAfterTax ? 'lmnp-reel' : 'micro-bic'));
+    const selectedTax = selectedMode === 'lmnp-reel' ? reelTax : microTax;
+    const selectedNetAfterTax = selectedMode === 'lmnp-reel' ? reelNetAfterTax : microNetAfterTax;
+
+    carryForwardReel = reelAfterCarry < 0 ? Math.abs(reelAfterCarry) : 0;
+    cumulative += selectedNetAfterTax;
+
+    rows.push({
+      year,
+      grossRevenue,
+      operatingCashCosts,
+      selectedTax,
+      selectedNetAfterTax,
+      cumulative,
+      selectedMode
+    });
+  }
+
+  const stressOcc = computeBaseAirbnb({ ...data, occupancyRate: clamp(data.occupancyRate - 10, 0, 100) }, controls).monthlyNetBeforeTax;
+  const stressAdr = computeBaseAirbnb({ ...data, nightlyRate: data.nightlyRate * 0.85 }, controls).monthlyNetBeforeTax;
+  const score = computeProScore(rows[0]?.selectedNetAfterTax / 12 || 0, stressOcc, stressAdr);
+
+  return {
+    rows,
+    totalAfterTax: rows.reduce((acc, r) => acc + r.selectedNetAfterTax, 0),
+    score,
+    stressOcc,
+    stressAdr
+  };
+}
+
+function computeProScore(monthlyNetAfterTax, stressOcc, stressAdr) {
+  const base = monthlyNetAfterTax >= 500 ? 45 : (monthlyNetAfterTax >= 100 ? 34 : (monthlyNetAfterTax >= 0 ? 24 : 10));
+  const occ = stressOcc >= 0 ? 30 : (stressOcc > -300 ? 18 : 7);
+  const adr = stressAdr >= 0 ? 25 : (stressAdr > -300 ? 15 : 5);
   return clamp(base + occ + adr, 0, 100);
 }
 
 function render() {
   const data = readInputs();
-  const base = computeAirbnb(data);
+  const controls = readProControls();
+  const base = computeBaseAirbnb(data);
+  const fiscal = computeFiscalComparison(data, base);
+
   const hasEssential = currentPlan === 'essential' || currentPlan === 'pro';
   const hasPro = currentPlan === 'pro';
 
   planState.textContent = `Plan actif: ${labelPlan(currentPlan)}`;
   lockNotice.textContent = hasEssential
-    ? 'Version Airbnb active: calculs courte duree avec moteur dedie.'
+    ? 'Version Airbnb active: base + fiscalite court terme debloquees.'
     : 'Cette variante Airbnb est reservee aux plans Essentiel et Pro. Passe sur un plan payant pour debloquer les resultats.';
 
   metrics.innerHTML = '';
+  fiscalCompare.innerHTML = '';
+  proMetrics.innerHTML = '';
+  projectionBody.innerHTML = '';
+  fiscalArea.hidden = true;
+  proArea.hidden = true;
+
   if (!hasEssential) {
-    metrics.innerHTML = `<article class="metric"><h4>Acces</h4><p>Plan payant requis</p></article>`;
-    proArea.hidden = true;
+    renderMetric('Acces', 'Plan payant requis');
     return;
   }
 
   renderMetric('Revenus annuels Airbnb', formatCurrency(base.grossRevenue));
-  renderMetric('Charges exploitation annuelles', formatCurrency(base.operatingCosts));
-  renderMetric('Service de la dette annuel', formatCurrency(base.debtAnnual));
-  renderMetric('Cashflow net mensuel', formatCurrency(base.monthlyNet));
-  renderMetric('Marge nette', formatPercent(base.netMargin));
+  renderMetric('Charges exploitation annuelles', formatCurrency(base.operatingCashCosts));
+  renderMetric('Interets annuels (annee 1)', formatCurrency(base.annualInterest));
+  renderMetric('Cashflow mensuel avant impot', formatCurrency(base.monthlyNetBeforeTax));
+  renderMetric(`Net mensuel apres impot (${modeLabel(fiscal.selectedMode)})`, formatCurrency(fiscal.selectedNetAfterTax / 12));
+  renderMetric('Marge avant impot', formatPercent(base.netMargin));
   renderMetric('Nuits louees / an', `${Math.round(base.nightsBooked)} nuits`);
 
-  proArea.hidden = !hasPro;
+  fiscalArea.hidden = false;
+  renderCompareCard('LMNP Micro-BIC', fiscal.micro.taxable, fiscal.micro.tax, fiscal.micro.netAfterTax, fiscal.selectedMode === 'micro-bic');
+  renderCompareCard('LMNP Reel', fiscal.reel.taxable, fiscal.reel.tax, fiscal.reel.netAfterTax, fiscal.selectedMode === 'lmnp-reel');
+
   if (!hasPro) return;
 
-  const pro = computePro(base, data);
-  proMetrics.innerHTML = '';
-  renderProMetric('CA ajuste (pricing+saisonnalite)', formatCurrency(pro.adjustedGross));
-  renderProMetric('Taxe de sejour estimee', formatCurrency(pro.cityTaxAnnual));
-  renderProMetric('Cashflow net mensuel Pro', formatCurrency(pro.proMonthlyNet));
-  renderProMetric('Stress test occupation -10 pts', formatCurrency(pro.stressOcc));
-  renderProMetric('Stress test ADR -15%', formatCurrency(pro.stressAdr));
-  renderProMetric('Airbnb Score Pro', `${Math.round(pro.score)}/100`);
+  proArea.hidden = false;
+  const baseWithProControls = computeBaseAirbnb(data, controls);
+  const projection = computeProjection(data, baseWithProControls, controls);
+
+  renderProMetric('CA ajuste annee 1', formatCurrency(baseWithProControls.grossRevenue));
+  renderProMetric('Taxe de sejour estimee', formatCurrency(baseWithProControls.cityTaxAnnual));
+  renderProMetric('Net mensuel apres impot (annee 1)', formatCurrency(projection.rows[0]?.selectedNetAfterTax / 12 || 0));
+  renderProMetric('Stress occupation -10 pts', formatCurrency(projection.stressOcc));
+  renderProMetric('Stress ADR -15%', formatCurrency(projection.stressAdr));
+  renderProMetric('Airbnb Score Pro', `${Math.round(projection.score)}/100`);
+  renderProMetric(`Cumul ${controls.years} ans apres impot`, formatCurrency(projection.totalAfterTax));
+
+  projectionBody.innerHTML = projection.rows.map((row) => `
+    <tr>
+      <td>${row.year}</td>
+      <td>${formatCurrency(row.grossRevenue)}</td>
+      <td>${formatCurrency(row.operatingCashCosts)}</td>
+      <td>${formatCurrency(row.selectedTax)}</td>
+      <td>${formatCurrency(row.selectedNetAfterTax)}</td>
+      <td>${formatCurrency(row.cumulative)}</td>
+    </tr>
+  `).join('');
 }
 
 function renderMetric(label, value) {
@@ -171,16 +313,47 @@ function renderProMetric(label, value) {
   proMetrics.appendChild(item);
 }
 
+function renderCompareCard(title, taxable, tax, net, selected) {
+  const item = document.createElement('article');
+  item.className = 'metric';
+  item.innerHTML = `
+    <h4>${escapeHtml(title)}${selected ? ' (selectionne)' : ''}</h4>
+    <p>${escapeHtml(formatCurrency(net / 12))} / mois net</p>
+    <p class="status">Base imposable: ${escapeHtml(formatCurrency(taxable))} | Impot: ${escapeHtml(formatCurrency(tax))}</p>
+  `;
+  fiscalCompare.appendChild(item);
+}
+
+function generateLoanSchedule(loanAmount, annualRate, loanYears) {
+  const months = Math.max(loanYears * 12, 0);
+  if (!loanAmount || !months) return [];
+  const monthlyRate = annualRate / 100 / 12;
+  const monthlyPayment = monthlyRate === 0
+    ? loanAmount / months
+    : (loanAmount * monthlyRate) / (1 - (1 + monthlyRate) ** -months);
+
+  let balance = loanAmount;
+  const yearly = [];
+  for (let month = 1; month <= months; month += 1) {
+    const interest = balance * monthlyRate;
+    const principal = monthlyPayment - interest;
+    balance = Math.max(balance - principal, 0);
+    const yearIndex = Math.ceil(month / 12) - 1;
+    if (!yearly[yearIndex]) yearly[yearIndex] = { payment: 0, interest: 0, balance: 0 };
+    yearly[yearIndex].payment += monthlyPayment;
+    yearly[yearIndex].interest += interest;
+    yearly[yearIndex].balance = balance;
+  }
+  return yearly;
+}
+
 async function registerAccount() {
   try {
     const payload = await apiFetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       includeAuth: false,
-      body: JSON.stringify({
-        email: authEmail.value.trim(),
-        password: authPassword.value
-      })
+      body: JSON.stringify({ email: authEmail.value.trim(), password: authPassword.value })
     });
     authToken = payload.token || '';
     currentUser = payload.user || null;
@@ -199,10 +372,7 @@ async function loginAccount() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       includeAuth: false,
-      body: JSON.stringify({
-        email: authEmail.value.trim(),
-        password: authPassword.value
-      })
+      body: JSON.stringify({ email: authEmail.value.trim(), password: authPassword.value })
     });
     authToken = payload.token || '';
     currentUser = payload.user || null;
@@ -292,6 +462,10 @@ function labelPlan(plan) {
   if (plan === 'pro') return 'Pro';
   if (plan === 'essential') return 'Essentiel';
   return 'Gratuit';
+}
+
+function modeLabel(mode) {
+  return mode === 'lmnp-reel' ? 'LMNP Reel' : 'LMNP Micro-BIC';
 }
 
 function clamp(value, min, max) {

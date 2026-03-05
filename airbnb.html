@@ -59,6 +59,20 @@
           <label>Consommables / menage<input name="suppliesPerTurnover" type="number" min="0" step="1" value="14" required></label>
           <label>Taxe fonciere / an<input name="propertyTax" type="number" min="0" step="10" value="1600" required></label>
           <label>Assurance PNO / an<input name="annualInsuranceFixed" type="number" min="0" step="10" value="420" required></label>
+          <label>CFE annuelle<input name="annualCfe" type="number" min="0" step="10" value="650" required></label>
+          <label>Comptable / an<input name="annualAccountingFees" type="number" min="0" step="10" value="900" required></label>
+          <label>Travaux deductibles / an<input name="annualDeductibleWorks" type="number" min="0" step="10" value="1200" required></label>
+          <label>Amortissement bati / an<input name="annualBuildingAmortization" type="number" min="0" step="100" value="5600" required></label>
+          <label>Amortissement mobilier / an<input name="annualFurnitureAmortization" type="number" min="0" step="100" value="1900" required></label>
+          <label>TMI (%)<input name="marginalTaxRate" type="number" min="0" max="45" step="1" value="30" required></label>
+          <label>Prelevements sociaux (%)<input name="socialTaxRate" type="number" min="0" max="30" step="0.1" value="17.2" required></label>
+          <label>Regime fiscal prefere
+            <select name="fiscalMode">
+              <option value="auto" selected>Auto (meilleur net)</option>
+              <option value="micro-bic">LMNP Micro-BIC</option>
+              <option value="lmnp-reel">LMNP Reel</option>
+            </select>
+          </label>
         </form>
       </section>
 
@@ -66,14 +80,37 @@
         <h2>Resultats</h2>
         <div id="lockNotice" class="lock-box"></div>
         <div id="metrics" class="metrics"></div>
+        <section id="fiscalArea" class="pro-area" hidden>
+          <h3>Fiscalite Airbnb (Essentiel+)</h3>
+          <div id="fiscalCompare" class="compare-grid"></div>
+          <p class="note">Hypothese simplifiee: simulation informative, a valider avec un expert comptable.</p>
+        </section>
         <section id="proArea" class="pro-area" hidden>
-          <h3>Analyse Pro Airbnb</h3>
+          <h3>Analyse Pro Airbnb (projection)</h3>
           <div class="pro-grid">
             <label>Uplift pricing dynamique (%)<input id="dynamicPricingUplift" type="number" min="-20" max="40" step="0.1" value="8"></label>
             <label>Indice saisonnalite annuel<input id="seasonalityIndex" type="number" min="0.6" max="1.4" step="0.01" value="1.04"></label>
             <label>Taxe de sejour reversee (%)<input id="cityTaxRate" type="number" min="0" max="20" step="0.1" value="4.5"></label>
+            <label>Horizon projection (ans)<input id="projectionYears" type="number" min="3" max="20" step="1" value="10"></label>
+            <label>Croissance CA annuel (%)<input id="annualRevenueGrowth" type="number" min="-10" max="20" step="0.1" value="2.5"></label>
+            <label>Croissance charges annuel (%)<input id="annualCostGrowth" type="number" min="-10" max="20" step="0.1" value="2"></label>
           </div>
           <div id="proMetrics" class="metrics"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Annee</th>
+                  <th>CA</th>
+                  <th>Charges</th>
+                  <th>Impot</th>
+                  <th>Net apres impot</th>
+                  <th>Cumul</th>
+                </tr>
+              </thead>
+              <tbody id="projectionBody"></tbody>
+            </table>
+          </div>
         </section>
       </section>
     </div>
