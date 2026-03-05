@@ -22,7 +22,7 @@
       <p class="subtitle">Moteur de calcul dedie a la location courte duree pour les plans Essentiel et Pro.</p>
       <div class="hero-links">
         <a class="ghost" href="/index.html">Retour simulateur locatif classique</a>
-        <a class="cta" href="/index.html">Voir les plans</a>
+        <button id="openPricingBtn" class="cta" type="button">Voir les plans</button>
       </div>
     </header>
 
@@ -115,6 +115,35 @@
       </section>
     </div>
   </main>
+
+  <div id="pricingModal" class="pricing-modal" hidden>
+    <div class="pricing-backdrop" data-close-pricing="true"></div>
+    <section class="pricing-dialog card" role="dialog" aria-modal="true" aria-label="Plans Rentium">
+      <div class="pricing-head">
+        <h2>Choisis ton plan</h2>
+        <button id="closePricingBtn" type="button" class="ghost">Fermer</button>
+      </div>
+      <p class="note">Debloque la version Airbnb Essentiel ou Pro directement depuis cette page.</p>
+      <small id="pricingStatus" class="status"></small>
+      <div class="pricing-grid">
+        <article class="metric">
+          <h4>Gratuit</h4>
+          <p>0 EUR</p>
+          <button type="button" class="ghost" data-select-plan="free">Rester Gratuit</button>
+        </article>
+        <article class="metric">
+          <h4>Essentiel</h4>
+          <p>29 EUR</p>
+          <button type="button" data-select-plan="essential">Choisir Essentiel</button>
+        </article>
+        <article class="metric">
+          <h4>Pro</h4>
+          <p>59 EUR</p>
+          <button type="button" data-select-plan="pro">Choisir Pro</button>
+        </article>
+      </div>
+    </section>
+  </div>
 
   <script src="airbnb.js" type="module"></script>
 </body>

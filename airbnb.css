@@ -189,6 +189,39 @@ label {
   overflow: auto;
 }
 
+.pricing-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.pricing-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.pricing-dialog {
+  position: relative;
+  z-index: 1;
+  max-width: 860px;
+  margin: 8vh auto 0;
+}
+
+.pricing-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.pricing-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -216,7 +249,8 @@ th {
   .auth-grid,
   .form-grid,
   .pro-grid,
-  .compare-grid {
+  .compare-grid,
+  .pricing-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -16,6 +16,10 @@ const proMetrics = document.getElementById('proMetrics');
 const proArea = document.getElementById('proArea');
 const lockNotice = document.getElementById('lockNotice');
 const projectionBody = document.getElementById('projectionBody');
+const openPricingBtn = document.getElementById('openPricingBtn');
+const pricingModal = document.getElementById('pricingModal');
+const closePricingBtn = document.getElementById('closePricingBtn');
+const pricingStatus = document.getElementById('pricingStatus');
 
 const dynamicPricingUplift = document.getElementById('dynamicPricingUplift');
 const seasonalityIndex = document.getElementById('seasonalityIndex');
@@ -37,6 +41,10 @@ function init() {
   registerBtn.addEventListener('click', registerAccount);
   loginBtn.addEventListener('click', loginAccount);
   logoutBtn.addEventListener('click', logoutAccount);
+  if (openPricingBtn) openPricingBtn.addEventListener('click', openPricingModal);
+  if (closePricingBtn) closePricingBtn.addEventListener('click', closePricingModal);
+  if (pricingModal) pricingModal.addEventListener('click', onPricingModalClick);
+  document.addEventListener('click', onPlanSelectClick);
   syncAuthState().finally(render);
 }
 
@@ -360,9 +368,11 @@ async function registerAccount() {
     if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
     updateAuthUI();
     await syncPlan();
+    setPricingStatus('');
     render();
   } catch (error) {
     authState.textContent = error.message || 'Erreur inscription';
+    setPricingStatus(error.message || 'Erreur inscription');
   }
 }
 
@@ -379,9 +389,11 @@ async function loginAccount() {
     if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
     updateAuthUI();
     await syncPlan();
+    setPricingStatus('');
     render();
   } catch (error) {
     authState.textContent = error.message || 'Erreur connexion';
+    setPricingStatus(error.message || 'Erreur connexion');
   }
 }
 
@@ -396,6 +408,7 @@ async function logoutAccount() {
   currentPlan = 'free';
   localStorage.removeItem(AUTH_TOKEN_KEY);
   updateAuthUI();
+  setPricingStatus('');
   render();
 }
 
@@ -439,6 +452,65 @@ function updateAuthUI() {
   logoutBtn.hidden = !connected;
   authEmail.disabled = connected;
   authPassword.disabled = connected;
+}
+
+function openPricingModal() {
+  if (!pricingModal) return;
+  pricingModal.hidden = false;
+  setPricingStatus('');
+}
+
+function closePricingModal() {
+  if (!pricingModal) return;
+  pricingModal.hidden = true;
+}
+
+function onPricingModalClick(event) {
+  if (!(event.target instanceof Element)) return;
+  if (event.target.closest('[data-close-pricing="true"]')) closePricingModal();
+}
+
+function onPlanSelectClick(event) {
+  if (!(event.target instanceof Element)) return;
+  const button = event.target.closest('[data-select-plan]');
+  if (!button) return;
+  selectPlan(button.getAttribute('data-select-plan') || '');
+}
+
+async function selectPlan(plan) {
+  if (!['free', 'essential', 'pro'].includes(plan)) return;
+
+  if (plan === 'free') {
+    setPricingStatus('Plan Gratuit conserve.');
+    closePricingModal();
+    return;
+  }
+
+  if (!authToken || !currentUser) {
+    setPricingStatus('Connecte-toi (ou cree un compte) sur cette page puis reessaie.');
+    return;
+  }
+
+  try {
+    setPricingStatus('Redirection vers le paiement Stripe...');
+    const payload = await apiFetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan })
+    });
+    if (payload?.url) {
+      window.location.href = payload.url;
+      return;
+    }
+    throw new Error('URL de paiement introuvable.');
+  } catch (error) {
+    setPricingStatus(error.message || 'Paiement indisponible.');
+  }
+}
+
+function setPricingStatus(message) {
+  if (!pricingStatus) return;
+  pricingStatus.textContent = message || '';
 }
 
 async function apiFetch(url, options = {}) {
