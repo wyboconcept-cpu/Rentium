@@ -16,6 +16,9 @@ const proMetrics = document.getElementById('proMetrics');
 const proArea = document.getElementById('proArea');
 const lockNotice = document.getElementById('lockNotice');
 const projectionBody = document.getElementById('projectionBody');
+const cityPresetSelect = document.getElementById('cityPresetSelect');
+const applyCityPresetBtn = document.getElementById('applyCityPresetBtn');
+const cityDataInfo = document.getElementById('cityDataInfo');
 const openPricingBtn = document.getElementById('openPricingBtn');
 const pricingModal = document.getElementById('pricingModal');
 const closePricingBtn = document.getElementById('closePricingBtn');
@@ -32,6 +35,34 @@ let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
 let currentUser = null;
 let currentPlan = 'free';
 
+const CITY_OFFICIAL_PRESETS = {
+  paris: {
+    label: 'Paris',
+    insee: { annualNights: 17800000, dailyNights: 48800, nightsPer1000: 23100, nonResidentShare: 0.61 },
+    defaults: { nightlyRate: 185, occupancyRate: 74, openDays: 345, turnoversPerMonth: 17, fixedMonthlyCosts: 420, conciergeRate: 20, propertyTax: 2100 }
+  },
+  nice: {
+    label: 'Nice',
+    insee: { annualNights: 3770000, dailyNights: 10300, nightsPer1000: 30300, nonResidentShare: 0.45 },
+    defaults: { nightlyRate: 145, occupancyRate: 70, openDays: 335, turnoversPerMonth: 13, fixedMonthlyCosts: 340, conciergeRate: 18, propertyTax: 1800 }
+  },
+  marseille: {
+    label: 'Marseille',
+    insee: { annualNights: 2490000, dailyNights: 6800, nightsPer1000: 7800, nonResidentShare: 0.39 },
+    defaults: { nightlyRate: 110, occupancyRate: 63, openDays: 325, turnoversPerMonth: 11, fixedMonthlyCosts: 320, conciergeRate: 17, propertyTax: 1600 }
+  },
+  lyon: {
+    label: 'Lyon',
+    insee: { annualNights: 2390000, dailyNights: 6500, nightsPer1000: 12600, nonResidentShare: 0.53 },
+    defaults: { nightlyRate: 118, occupancyRate: 64, openDays: 330, turnoversPerMonth: 12, fixedMonthlyCosts: 330, conciergeRate: 18, propertyTax: 1700 }
+  },
+  toulouse: {
+    label: 'Toulouse',
+    insee: { annualNights: 1300000, dailyNights: 3700, nightsPer1000: 7900, nonResidentShare: 0.40 },
+    defaults: { nightlyRate: 98, occupancyRate: 59, openDays: 320, turnoversPerMonth: 10, fixedMonthlyCosts: 300, conciergeRate: 16, propertyTax: 1500 }
+  }
+};
+
 init();
 
 function init() {
@@ -45,7 +76,10 @@ function init() {
   if (closePricingBtn) closePricingBtn.addEventListener('click', closePricingModal);
   if (pricingModal) pricingModal.addEventListener('click', onPricingModalClick);
   document.addEventListener('click', onPlanSelectClick);
+  if (cityPresetSelect) cityPresetSelect.addEventListener('change', onCityPresetChange);
+  if (applyCityPresetBtn) applyCityPresetBtn.addEventListener('click', onCityPresetApplyClick);
   syncAuthState().finally(render);
+  applyInitialCityPreset();
 }
 
 function readInputs() {
@@ -335,6 +369,65 @@ function render() {
       <td>${formatCurrency(row.cumulative)}</td>
     </tr>
   `).join('');
+}
+
+function applyInitialCityPreset() {
+  if (!cityPresetSelect) return;
+  const key = String(cityPresetSelect.value || 'paris');
+  applyCityPreset(key, { silent: true });
+}
+
+function onCityPresetChange() {
+  const key = String(cityPresetSelect?.value || 'paris');
+  updateCityInfoOnly(key);
+}
+
+function onCityPresetApplyClick() {
+  const key = String(cityPresetSelect?.value || 'paris');
+  applyCityPreset(key);
+}
+
+async function applyCityPreset(key, options = {}) {
+  const preset = CITY_OFFICIAL_PRESETS[key];
+  if (!preset || !form) return;
+
+  const pairs = Object.entries(preset.defaults);
+  pairs.forEach(([field, value]) => {
+    const input = form.elements.namedItem(field);
+    if (input instanceof HTMLInputElement) input.value = String(value);
+  });
+
+  await updateCityInfoOnly(key);
+  if (!options.silent) render();
+}
+
+async function updateCityInfoOnly(key) {
+  const preset = CITY_OFFICIAL_PRESETS[key];
+  if (!preset || !cityDataInfo) return;
+  const population = await fetchCityPopulation(preset.label);
+  const popText = population > 0
+    ? `Population INSEE API: ${new Intl.NumberFormat('fr-FR').format(population)} hab.`
+    : 'Population INSEE API: indisponible.';
+
+  cityDataInfo.textContent = `${preset.label} - Source officielle Insee Premiere n°1879 (donnees 2019): `
+    + `${new Intl.NumberFormat('fr-FR').format(preset.insee.annualNights)} nuitees annuelles, `
+    + `${new Intl.NumberFormat('fr-FR').format(preset.insee.dailyNights)} nuitees/jour, `
+    + `${new Intl.NumberFormat('fr-FR').format(preset.insee.nightsPer1000)} nuitees/jour/1000 hab, `
+    + `${Math.round(preset.insee.nonResidentShare * 100)}% non-residents. `
+    + `${popText}`;
+}
+
+async function fetchCityPopulation(cityName) {
+  try {
+    const url = `https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(cityName)}&boost=population&limit=1&fields=nom,population`;
+    const response = await fetch(url);
+    if (!response.ok) return 0;
+    const payload = await response.json();
+    if (!Array.isArray(payload) || !payload.length) return 0;
+    return Number(payload[0]?.population || 0);
+  } catch {
+    return 0;
+  }
 }
 
 function renderMetric(label, value) {

@@ -43,6 +43,19 @@
       <section class="card">
         <h2>Parametres Airbnb</h2>
         <form id="airbnbForm" class="form-grid">
+          <label>Ville de reference (Airbnb)
+            <select id="cityPresetSelect">
+              <option value="paris">Paris</option>
+              <option value="nice">Nice</option>
+              <option value="marseille">Marseille</option>
+              <option value="lyon">Lyon</option>
+              <option value="toulouse">Toulouse</option>
+            </select>
+          </label>
+          <label>
+            <span>Preselection officielle</span>
+            <button id="applyCityPresetBtn" type="button" class="ghost">Pre-remplir la ville</button>
+          </label>
           <label>Prix du bien<input name="purchasePrice" type="number" min="0" step="1000" value="250000" required></label>
           <label>Apport<input name="downPayment" type="number" min="0" step="1000" value="40000" required></label>
           <label>Taux credit (%)<input name="interestRate" type="number" min="0" step="0.01" value="3.7" required></label>
@@ -79,6 +92,7 @@
             </select>
           </label>
         </form>
+        <p id="cityDataInfo" class="note"></p>
       </section>
 
       <section class="card">
