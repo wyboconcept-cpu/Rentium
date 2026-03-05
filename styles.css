@@ -82,12 +82,23 @@ body {
   text-align: right;
 }
 
+.subscription-panel {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding: 14px;
+}
+
+.subscription-panel h2 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+}
+
 .mode-switch {
-  grid-column: 1;
-  justify-self: start;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  margin-bottom: 10px;
 }
 
 .current-plan-badge {
@@ -99,21 +110,20 @@ body {
   background: #181511;
 }
 
-.auth-bar {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
+.auth-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   align-items: center;
 }
 
-.auth-bar input {
-  width: auto;
-  min-width: 180px;
+.auth-grid input {
+  min-width: 0;
 }
 
 .auth-state {
   color: var(--muted);
+  grid-column: 1 / -1;
 }
 
 .mode-switch select {
@@ -816,14 +826,13 @@ body.modal-open {
     text-align: left;
   }
 
-  .auth-bar input {
+  .onboarding-auth input {
     width: 100%;
     min-width: 0;
   }
 
-  .onboarding-auth input {
-    width: 100%;
-    min-width: 0;
+  .auth-grid {
+    grid-template-columns: 1fr;
   }
 
   .pro-inputs,
@@ -854,7 +863,7 @@ body.modal-open {
   .pro-card,
   .legal-card,
   .mode-switch,
-  .auth-bar {
+  .auth-grid {
     display: none !important;
   }
 

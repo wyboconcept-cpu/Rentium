@@ -46,23 +46,26 @@
     <p class="seo-intro">
       Rentium est un simulateur immobilier pour estimer la rentabilite locative, le cashflow, le rendement net et la projection long terme d'un investissement.
     </p>
-    <div class="mode-switch">
-      <span id="currentPlanBadge" class="current-plan-badge">Plan actif: Gratuit</span>
-      <select id="planSelect" hidden aria-hidden="true">
-        <option value="free">Gratuit</option>
-        <option value="essential">Essentiel (29 EUR)</option>
-        <option value="pro">Pro (59 EUR)</option>
-      </select>
-      <button id="openPricingBtn" type="button" class="ghost-btn">Voir les plans</button>
-    </div>
-    <div class="auth-bar">
-      <input id="authEmail" type="email" placeholder="Email" autocomplete="email" />
-      <input id="authPassword" type="password" placeholder="Mot de passe" autocomplete="current-password" />
-      <button id="registerBtn" type="button" class="ghost-btn">Creer compte</button>
-      <button id="loginBtn" type="button">Connexion</button>
-      <button id="logoutBtn" type="button" class="ghost-btn" hidden>Deconnexion</button>
-      <small id="authState" class="auth-state">Non connecte</small>
-    </div>
+    <section class="subscription-panel card">
+      <h2>Connexion abonnement</h2>
+      <div class="mode-switch">
+        <span id="currentPlanBadge" class="current-plan-badge">Plan actif: Gratuit</span>
+        <select id="planSelect" hidden aria-hidden="true">
+          <option value="free">Gratuit</option>
+          <option value="essential">Essentiel (29 EUR)</option>
+          <option value="pro">Pro (59 EUR)</option>
+        </select>
+        <button id="openPricingBtn" type="button" class="ghost-btn">Voir les plans</button>
+      </div>
+      <div class="auth-grid">
+        <input id="authEmail" type="email" placeholder="Email" autocomplete="email" />
+        <input id="authPassword" type="password" placeholder="Mot de passe" autocomplete="current-password" />
+        <button id="registerBtn" type="button" class="ghost-btn">Creer compte</button>
+        <button id="loginBtn" type="button">Connexion</button>
+        <button id="logoutBtn" type="button" class="ghost-btn" hidden>Deconnexion</button>
+        <small id="authState" class="auth-state">Non connecte</small>
+      </div>
+    </section>
   </header>
 
   <main class="layout">
