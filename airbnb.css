@@ -214,6 +214,29 @@ label {
   font-size: 0.85rem;
 }
 
+.reco-list {
+  display: grid;
+  gap: 8px;
+}
+
+.reco-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #132027;
+}
+
+.reco-item h4 {
+  margin: 0 0 5px;
+  font-size: 0.95rem;
+}
+
+.reco-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
 .pro-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

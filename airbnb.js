@@ -12,6 +12,8 @@ const form = document.getElementById('airbnbForm');
 const metrics = document.getElementById('metrics');
 const fiscalArea = document.getElementById('fiscalArea');
 const fiscalCompare = document.getElementById('fiscalCompare');
+const recoArea = document.getElementById('recoArea');
+const recoList = document.getElementById('recoList');
 const proMetrics = document.getElementById('proMetrics');
 const proArea = document.getElementById('proArea');
 const lockNotice = document.getElementById('lockNotice');
@@ -319,6 +321,14 @@ function render() {
   const controls = readProControls();
   const base = computeBaseAirbnb(data);
   const fiscal = computeFiscalComparison(data, base);
+  const baselineEval = evaluateScenario(data, {
+    uplift: 0,
+    seasonality: 1,
+    cityTax: 0,
+    years: 10,
+    revenueGrowth: 0,
+    costGrowth: 0
+  });
 
   const hasEssential = currentPlan === 'essential' || currentPlan === 'pro';
   const hasPro = currentPlan === 'pro';
@@ -330,9 +340,11 @@ function render() {
 
   metrics.innerHTML = '';
   fiscalCompare.innerHTML = '';
+  if (recoList) recoList.innerHTML = '';
   proMetrics.innerHTML = '';
   projectionBody.innerHTML = '';
   fiscalArea.hidden = true;
+  if (recoArea) recoArea.hidden = true;
   proArea.hidden = true;
 
   if (!hasEssential) {
@@ -354,6 +366,19 @@ function render() {
     if (!item) return;
     renderCompareCard(modeLabel(key), item.taxable, item.tax, item.netAfterTax, fiscal.selectedMode === key);
   });
+
+  if (recoArea && recoList) {
+    const recos = generateInvestmentRecommendations(data, {
+      uplift: 0,
+      seasonality: 1,
+      cityTax: 0,
+      years: 10,
+      revenueGrowth: 0,
+      costGrowth: 0
+    }, baselineEval, 5);
+    recoArea.hidden = false;
+    renderRecommendations(recos);
+  }
 
   if (!hasPro) return;
 
@@ -378,6 +403,101 @@ function render() {
       <td>${formatCurrency(row.selectedNetAfterTax)}</td>
       <td>${formatCurrency(row.cumulative)}</td>
     </tr>
+  `).join('');
+
+  if (recoArea && recoList) {
+    const proBaselineEval = evaluateScenario(data, controls);
+    const proRecos = generateInvestmentRecommendations(data, controls, proBaselineEval, 8);
+    renderRecommendations(proRecos);
+  }
+}
+
+function evaluateScenario(data, controls) {
+  const base = computeBaseAirbnb(data, controls);
+  const fiscal = computeFiscalComparison(data, base);
+  const projection = computeProjection(data, base, controls);
+  return {
+    monthlyAfterTax: fiscal.selectedNetAfterTax / 12,
+    score: projection.score,
+    selectedMode: fiscal.selectedMode
+  };
+}
+
+function generateInvestmentRecommendations(data, controls, baseline, limit = 6) {
+  const candidates = [
+    {
+      title: 'Ameliorer l occupation (+5 pts)',
+      effort: 'Moyen',
+      assumptions: 'Optimisation annonce + check-in',
+      target: `${clamp(data.occupancyRate + 5, 0, 100).toFixed(1)} %`,
+      apply: (d) => ({ ...d, occupancyRate: clamp(d.occupancyRate + 5, 0, 100) })
+    },
+    {
+      title: 'Ajuster le prix nuit (+8%)',
+      effort: 'Moyen',
+      assumptions: 'Pricing dynamique et weekends',
+      target: formatCurrency(data.nightlyRate * 1.08),
+      apply: (d) => ({ ...d, nightlyRate: d.nightlyRate * 1.08 })
+    },
+    {
+      title: 'Baisser la conciergerie (-2 pts)',
+      effort: 'Moyen',
+      assumptions: 'Renegociation mandat',
+      target: `${Math.max(data.conciergeRate - 2, 0).toFixed(1)} %`,
+      apply: (d) => ({ ...d, conciergeRate: Math.max(d.conciergeRate - 2, 0) })
+    },
+    {
+      title: 'Reduire charges fixes (-10%)',
+      effort: 'Moyen',
+      assumptions: 'Optimisation contrats',
+      target: formatCurrency(data.fixedMonthlyCosts * 0.9),
+      apply: (d) => ({ ...d, fixedMonthlyCosts: d.fixedMonthlyCosts * 0.9 })
+    },
+    {
+      title: 'Augmenter jours ouverts (+20)',
+      effort: 'Faible',
+      assumptions: 'Limiter indisponibilites',
+      target: `${Math.min(data.openDays + 20, 365)} jours`,
+      apply: (d) => ({ ...d, openDays: Math.min(d.openDays + 20, 365) })
+    },
+    {
+      title: 'Fiscalite en mode Auto',
+      effort: 'Faible',
+      assumptions: 'Selection du meilleur net',
+      target: 'Auto',
+      apply: (d) => ({ ...d, fiscalMode: 'auto' })
+    }
+  ];
+
+  const scored = candidates.map((candidate) => {
+    const nextData = candidate.apply(data);
+    const nextEval = evaluateScenario(nextData, controls);
+    return {
+      ...candidate,
+      deltaScore: nextEval.score - baseline.score,
+      deltaMonthlyAfterTax: nextEval.monthlyAfterTax - baseline.monthlyAfterTax,
+      nextMode: modeLabel(nextEval.selectedMode)
+    };
+  }).filter((item) => item.deltaScore > 0.2 || item.deltaMonthlyAfterTax > 15);
+
+  return scored
+    .sort((a, b) => (b.deltaScore - a.deltaScore) || (b.deltaMonthlyAfterTax - a.deltaMonthlyAfterTax))
+    .slice(0, limit);
+}
+
+function renderRecommendations(recos) {
+  if (!recoList) return;
+  if (!recos.length) {
+    recoList.innerHTML = '<article class="reco-item"><h4>Aucune optimisation differenciante</h4><p>Les reglages actuels sont deja proches du meilleur compromis sur ce moteur.</p></article>';
+    return;
+  }
+
+  recoList.innerHTML = recos.map((reco, index) => `
+    <article class="reco-item">
+      <h4>${index + 1}. ${escapeHtml(reco.title)} <span class="note">(${escapeHtml(reco.effort)})</span></h4>
+      <p>Objectif: <strong>${escapeHtml(reco.target)}</strong> | Delta score: <strong>+${reco.deltaScore.toFixed(1)} pts</strong> | Delta net: <strong>${formatSignedCurrency(reco.deltaMonthlyAfterTax)} / mois</strong></p>
+      <p>Hypothese: ${escapeHtml(reco.assumptions)} | Regime projete: ${escapeHtml(reco.nextMode)}</p>
+    </article>
   `).join('');
 }
 
@@ -701,6 +821,10 @@ function clamp(value, min, max) {
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value || 0);
+}
+
+function formatSignedCurrency(value) {
+  return `${value >= 0 ? '+' : ''}${formatCurrency(value)}`;
 }
 
 function formatPercent(value) {
