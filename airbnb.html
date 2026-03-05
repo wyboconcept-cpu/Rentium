@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rentium Airbnb | Simulateur Essentiel et Pro</title>
+  <meta name="description" content="Variante Airbnb de Rentium: simulation location courte duree avec calculs dedies, reservee aux abonnements Essentiel et Pro." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://www.rentium.investments/airbnb.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Rentium Airbnb | Simulateur Essentiel et Pro" />
+  <meta property="og:description" content="Estime revenus, charges, cashflow et resilence d'un bien Airbnb avec une interface dediee." />
+  <meta property="og:url" content="https://www.rentium.investments/airbnb.html" />
+  <meta property="og:image" content="https://www.rentium.investments/rentium-logo.png.png" />
+  <link rel="stylesheet" href="airbnb.css" />
+</head>
+<body>
+  <main class="airbnb-shell">
+    <header class="airbnb-hero">
+      <p class="eyebrow">Rentium Variant</p>
+      <h1>Simulateur Airbnb</h1>
+      <p class="subtitle">Moteur de calcul dedie a la location courte duree pour les plans Essentiel et Pro.</p>
+      <div class="hero-links">
+        <a class="ghost" href="/index.html">Retour simulateur locatif classique</a>
+        <a class="cta" href="/index.html">Voir les plans</a>
+      </div>
+    </header>
+
+    <section class="airbnb-auth card">
+      <h2>Connexion abonnement</h2>
+      <div class="auth-grid">
+        <input id="authEmail" type="email" placeholder="Email" autocomplete="email" />
+        <input id="authPassword" type="password" placeholder="Mot de passe" autocomplete="current-password" />
+        <button id="registerBtn" type="button" class="ghost">Creer compte</button>
+        <button id="loginBtn" type="button">Connexion</button>
+        <button id="logoutBtn" type="button" class="ghost" hidden>Deconnexion</button>
+      </div>
+      <p id="authState" class="status">Non connecte</p>
+      <p id="planState" class="status">Plan actif: Gratuit</p>
+    </section>
+
+    <div class="airbnb-layout">
+      <section class="card">
+        <h2>Parametres Airbnb</h2>
+        <form id="airbnbForm" class="form-grid">
+          <label>Prix du bien<input name="purchasePrice" type="number" min="0" step="1000" value="250000" required></label>
+          <label>Apport<input name="downPayment" type="number" min="0" step="1000" value="40000" required></label>
+          <label>Taux credit (%)<input name="interestRate" type="number" min="0" step="0.01" value="3.7" required></label>
+          <label>Duree credit (ans)<input name="loanYears" type="number" min="1" step="1" value="20" required></label>
+          <label>Assurance annuelle (%)<input name="insuranceRate" type="number" min="0" step="0.01" value="0.34" required></label>
+          <label>Prix nuit moyen (ADR)<input name="nightlyRate" type="number" min="10" step="1" value="115" required></label>
+          <label>Taux occupation (%)<input name="occupancyRate" type="number" min="0" max="100" step="0.1" value="68" required></label>
+          <label>Jours ouverts / an<input name="openDays" type="number" min="1" max="365" step="1" value="330" required></label>
+          <label>Menages / mois<input name="turnoversPerMonth" type="number" min="0" step="1" value="11" required></label>
+          <label>Frais menage facture (EUR)<input name="cleaningFeeCharged" type="number" min="0" step="1" value="45" required></label>
+          <label>Commission plateforme (%)<input name="platformFeeRate" type="number" min="0" max="30" step="0.1" value="3" required></label>
+          <label>Conciergerie (%)<input name="conciergeRate" type="number" min="0" max="40" step="0.1" value="18" required></label>
+          <label>Charges fixes / mois<input name="fixedMonthlyCosts" type="number" min="0" step="10" value="280" required></label>
+          <label>Consommables / menage<input name="suppliesPerTurnover" type="number" min="0" step="1" value="14" required></label>
+          <label>Taxe fonciere / an<input name="propertyTax" type="number" min="0" step="10" value="1600" required></label>
+          <label>Assurance PNO / an<input name="annualInsuranceFixed" type="number" min="0" step="10" value="420" required></label>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Resultats</h2>
+        <div id="lockNotice" class="lock-box"></div>
+        <div id="metrics" class="metrics"></div>
+        <section id="proArea" class="pro-area" hidden>
+          <h3>Analyse Pro Airbnb</h3>
+          <div class="pro-grid">
+            <label>Uplift pricing dynamique (%)<input id="dynamicPricingUplift" type="number" min="-20" max="40" step="0.1" value="8"></label>
+            <label>Indice saisonnalite annuel<input id="seasonalityIndex" type="number" min="0.6" max="1.4" step="0.01" value="1.04"></label>
+            <label>Taxe de sejour reversee (%)<input id="cityTaxRate" type="number" min="0" max="20" step="0.1" value="4.5"></label>
+          </div>
+          <div id="proMetrics" class="metrics"></div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script src="airbnb.js" type="module"></script>
+</body>
+</html>

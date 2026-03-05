@@ -378,6 +378,7 @@ app.get('/sitemap.xml', (_req, res) => {
     `${appUrl}/`,
     `${appUrl}/index.html`,
     `${appUrl}/payment.html`,
+    `${appUrl}/airbnb.html`,
     `${appUrl}/simulateur-rentabilite-locative.html`,
     `${appUrl}/calcul-cashflow-immobilier.html`,
     `${appUrl}/lmnp-micro-bic-vs-reel.html`,
