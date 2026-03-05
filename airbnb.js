@@ -63,6 +63,16 @@ const CITY_OFFICIAL_PRESETS = {
   }
 };
 
+const NEUTRAL_DEFAULTS = {
+  nightlyRate: 115,
+  occupancyRate: 65,
+  openDays: 330,
+  turnoversPerMonth: 11,
+  fixedMonthlyCosts: 320,
+  conciergeRate: 18,
+  propertyTax: 1700
+};
+
 init();
 
 function init() {
@@ -373,25 +383,28 @@ function render() {
 
 function applyInitialCityPreset() {
   if (!cityPresetSelect) return;
-  const key = String(cityPresetSelect.value || 'paris');
+  const key = String(cityPresetSelect.value || 'none');
   applyCityPreset(key, { silent: true });
 }
 
 function onCityPresetChange() {
-  const key = String(cityPresetSelect?.value || 'paris');
+  const key = String(cityPresetSelect?.value || 'none');
   updateCityInfoOnly(key);
 }
 
 function onCityPresetApplyClick() {
-  const key = String(cityPresetSelect?.value || 'paris');
+  const key = String(cityPresetSelect?.value || 'none');
   applyCityPreset(key);
 }
 
 async function applyCityPreset(key, options = {}) {
-  const preset = CITY_OFFICIAL_PRESETS[key];
-  if (!preset || !form) return;
+  if (!form) return;
 
-  const pairs = Object.entries(preset.defaults);
+  const preset = CITY_OFFICIAL_PRESETS[key];
+  const defaults = key === 'none' ? NEUTRAL_DEFAULTS : preset?.defaults;
+  if (!defaults) return;
+
+  const pairs = Object.entries(defaults);
   pairs.forEach(([field, value]) => {
     const input = form.elements.namedItem(field);
     if (input instanceof HTMLInputElement) input.value = String(value);
@@ -402,8 +415,14 @@ async function applyCityPreset(key, options = {}) {
 }
 
 async function updateCityInfoOnly(key) {
+  if (!cityDataInfo) return;
+  if (key === 'none') {
+    cityDataInfo.textContent = 'Mode neutre actif: aucune ville de reference appliquee.';
+    return;
+  }
+
   const preset = CITY_OFFICIAL_PRESETS[key];
-  if (!preset || !cityDataInfo) return;
+  if (!preset) return;
   const population = await fetchCityPopulation(preset.label);
   const popText = population > 0
     ? `Population INSEE API: ${new Intl.NumberFormat('fr-FR').format(population)} hab.`
