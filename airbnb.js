@@ -391,7 +391,7 @@ function render() {
   renderProMetric('Net mensuel apres impot (annee 1)', formatCurrency(projection.rows[0]?.selectedNetAfterTax / 12 || 0));
   renderProMetric('Stress occupation -10 pts', formatCurrency(projection.stressOcc));
   renderProMetric('Stress ADR -15%', formatCurrency(projection.stressAdr));
-  renderProMetric('Airbnb Score Pro', `${Math.round(projection.score)}/100`);
+  renderProMetric('Airbnb Score Pro', `${Math.round(projection.score)}/100`, scoreToneClass(projection.score));
   renderProMetric(`Cumul ${controls.years} ans apres impot`, formatCurrency(projection.totalAfterTax));
 
   projectionBody.innerHTML = projection.rows.map((row) => `
@@ -576,9 +576,9 @@ function renderMetric(label, value) {
   metrics.appendChild(item);
 }
 
-function renderProMetric(label, value) {
+function renderProMetric(label, value, extraClass = '') {
   const item = document.createElement('article');
-  item.className = 'metric';
+  item.className = `metric ${extraClass}`.trim();
   item.innerHTML = `<h4>${escapeHtml(label)}</h4><p>${escapeHtml(value)}</p>`;
   proMetrics.appendChild(item);
 }
@@ -805,6 +805,14 @@ function modeLabel(mode) {
   if (mode === 'lmp-reel') return 'LMP Reel';
   if (mode === 'sci-is') return 'Societe (IS)';
   return 'Regime';
+}
+
+function scoreToneClass(score) {
+  const value = Number(score || 0);
+  if (value < 35) return 'score-tone-red';
+  if (value < 55) return 'score-tone-orange';
+  if (value < 75) return 'score-tone-yellow';
+  return 'score-tone-green';
 }
 
 function normalizeFiscalMode(mode) {

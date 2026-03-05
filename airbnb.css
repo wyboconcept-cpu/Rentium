@@ -188,6 +188,26 @@ label {
   font-weight: 700;
 }
 
+.metric.score-tone-red {
+  border-color: rgba(216, 106, 106, 0.55);
+  background: linear-gradient(180deg, rgba(216, 106, 106, 0.14), rgba(22, 34, 41, 0.95));
+}
+
+.metric.score-tone-orange {
+  border-color: rgba(240, 155, 99, 0.6);
+  background: linear-gradient(180deg, rgba(240, 155, 99, 0.16), rgba(22, 34, 41, 0.95));
+}
+
+.metric.score-tone-yellow {
+  border-color: rgba(225, 193, 94, 0.62);
+  background: linear-gradient(180deg, rgba(225, 193, 94, 0.17), rgba(22, 34, 41, 0.95));
+}
+
+.metric.score-tone-green {
+  border-color: rgba(82, 191, 145, 0.62);
+  background: linear-gradient(180deg, rgba(82, 191, 145, 0.16), rgba(22, 34, 41, 0.95));
+}
+
 .lock-box {
   margin-bottom: 10px;
   border: 1px dashed #9c5d3d;
