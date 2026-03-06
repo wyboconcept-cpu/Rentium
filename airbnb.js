@@ -45,6 +45,9 @@ let currentPlan = 'free';
 let lastReport = null;
 const AIRBNB_SCENARIOS_KEY = 'rentium_airbnb_scenarios_v1';
 let airbnbScenarios = readSavedAirbnbScenarios();
+let chartRows = [];
+let chartHoverIndex = null;
+let chartLayout = null;
 
 const CITY_OFFICIAL_PRESETS = {
   paris: {
@@ -102,6 +105,10 @@ function init() {
   if (scenariosList) scenariosList.addEventListener('click', onScenariosClick);
   if (cityPresetSelect) cityPresetSelect.addEventListener('change', onCityPresetChange);
   if (applyCityPresetBtn) applyCityPresetBtn.addEventListener('click', onCityPresetApplyClick);
+  if (airbnbChart) {
+    airbnbChart.addEventListener('mousemove', onChartHoverMove);
+    airbnbChart.addEventListener('mouseleave', onChartHoverLeave);
+  }
   syncAuthState().finally(render);
   applyInitialCityPreset();
   renderScenarios();
@@ -457,6 +464,7 @@ function render() {
 
 function renderChart(rows) {
   if (!airbnbChart) return;
+  chartRows = rows || [];
   const ctx = airbnbChart.getContext('2d');
   const width = airbnbChart.width;
   const height = airbnbChart.height;
@@ -468,16 +476,18 @@ function renderChart(rows) {
   const padLeft = 58;
   const padRight = 20;
   const padTop = 20;
-  const padBottom = 34;
+  const padBottom = 40;
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
   const netSeries = rows.map((r) => r.selectedNetAfterTax);
   const cumSeries = rows.map((r) => r.cumulative);
-  const all = [...netSeries, ...cumSeries, 0];
+  const taxSeries = rows.map((r) => r.selectedTax);
+  const all = [...netSeries, ...cumSeries, ...taxSeries, 0];
   const minY = Math.min(...all);
   const maxY = Math.max(...all);
   const range = maxY - minY || 1;
+  chartLayout = { width, height, padLeft, padRight, padTop, padBottom, minY, range, count: rows.length };
 
   for (let i = 0; i <= 5; i += 1) {
     const y = padTop + (plotH * i) / 5;
@@ -495,18 +505,40 @@ function renderChart(rows) {
   ctx.lineTo(width - padRight, height - padBottom);
   ctx.stroke();
 
+  drawBars(ctx, taxSeries, 'rgba(173, 137, 232, 0.45)', rows.length, { padLeft, padRight, padTop, padBottom, width, height, minY, range });
   drawSeries(ctx, netSeries, '#ff7a3d', rows.length, { padLeft, padRight, padTop, padBottom, width, height, minY, range });
   drawSeries(ctx, cumSeries, '#15b7aa', rows.length, { padLeft, padRight, padTop, padBottom, width, height, minY, range });
 
-  ctx.fillStyle = '#a8bdc3';
+  const firstYear = rows[0]?.year || 1;
+  const lastYear = rows[rows.length - 1]?.year || rows.length;
+  ctx.fillStyle = '#8ca6b0';
+  ctx.font = '11px Outfit';
+  ctx.fillText(`An ${firstYear}`, padLeft, height - 12);
+  ctx.fillText(`An ${lastYear}`, width - padRight - 38, height - 12);
+
+  if (chartHoverIndex !== null && chartHoverIndex >= 0 && chartHoverIndex < rows.length) {
+    const x = toChartX(chartHoverIndex, rows.length, width, padLeft, padRight);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.moveTo(x, padTop);
+    ctx.lineTo(x, height - padBottom);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#ff7a3d';
   ctx.font = '12px Outfit';
   ctx.fillText('Net apres impot', padLeft + 8, padTop + 12);
   ctx.fillStyle = '#15b7aa';
-  ctx.fillText('Cumul', padLeft + 130, padTop + 12);
+  ctx.fillText('Cumul', padLeft + 132, padTop + 12);
+  ctx.fillStyle = '#ad89e8';
+  ctx.fillText('Impot', padLeft + 200, padTop + 12);
 
-  if (chartFocus) {
+  if (chartFocus && chartHoverIndex !== null && chartHoverIndex >= 0 && chartHoverIndex < rows.length) {
+    const row = rows[chartHoverIndex];
+    chartFocus.textContent = `Annee ${row.year}: CA ${formatCurrency(row.grossRevenue)} | Charges ${formatCurrency(row.operatingCashCosts)} | Impot ${formatCurrency(row.selectedTax)} | Net ${formatCurrency(row.selectedNetAfterTax)} | Cumul ${formatCurrency(row.cumulative)}`;
+  } else if (chartFocus) {
     const last = rows[rows.length - 1];
-    chartFocus.textContent = `Annee ${last.year}: Net ${formatCurrency(last.selectedNetAfterTax)} | Cumul ${formatCurrency(last.cumulative)}`;
+    chartFocus.textContent = `Annee ${last.year}: CA ${formatCurrency(last.grossRevenue)} | Impot ${formatCurrency(last.selectedTax)} | Net ${formatCurrency(last.selectedNetAfterTax)} | Cumul ${formatCurrency(last.cumulative)}`;
   }
 }
 
@@ -523,8 +555,44 @@ function drawSeries(ctx, values, color, count, layout) {
   ctx.stroke();
 }
 
+function drawBars(ctx, values, color, count, layout) {
+  const barW = Math.max(4, ((layout.width - layout.padLeft - layout.padRight) / Math.max(count, 1)) * 0.45);
+  values.forEach((value, idx) => {
+    const x = toChartX(idx, count, layout.width, layout.padLeft, layout.padRight) - (barW / 2);
+    const y = layout.height - layout.padBottom - ((value - layout.minY) / layout.range) * (layout.height - layout.padTop - layout.padBottom);
+    const y0 = layout.height - layout.padBottom - ((0 - layout.minY) / layout.range) * (layout.height - layout.padTop - layout.padBottom);
+    const top = Math.min(y, y0);
+    const h = Math.abs(y0 - y);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, top, barW, Math.max(h, 1));
+  });
+}
+
+function onChartHoverMove(event) {
+  if (!chartLayout || !chartRows.length) return;
+  const rect = airbnbChart.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const usable = chartLayout.width - chartLayout.padLeft - chartLayout.padRight;
+  const ratio = clamp((x - chartLayout.padLeft) / Math.max(usable, 1), 0, 1);
+  chartHoverIndex = Math.round(ratio * (chartLayout.count - 1));
+  renderChart(chartRows);
+}
+
+function onChartHoverLeave() {
+  chartHoverIndex = null;
+  renderChart(chartRows);
+}
+
+function toChartX(index, count, width, padLeft, padRight) {
+  if (count <= 1) return padLeft;
+  return padLeft + (index / (count - 1)) * (width - padLeft - padRight);
+}
+
 function exportPdfReport() {
   if (!lastReport) return;
+  if (lastReport?.projection?.rows?.length) {
+    renderChart(lastReport.projection.rows);
+  }
   const chartImage = airbnbChart ? airbnbChart.toDataURL('image/png') : '';
   const rows = lastReport.projection?.rows || [];
   const win = window.open('', '_blank');
