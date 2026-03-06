@@ -41,6 +41,8 @@ const cityTaxRate = document.getElementById('cityTaxRate');
 const projectionYears = document.getElementById('projectionYears');
 const annualRevenueGrowth = document.getElementById('annualRevenueGrowth');
 const annualCostGrowth = document.getElementById('annualCostGrowth');
+const fiscalityEnabledToggle = document.getElementById('fiscalityEnabledToggle');
+const fiscalVariablesWrap = document.getElementById('fiscalVariablesWrap');
 
 let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
 let currentUser = null;
@@ -97,6 +99,7 @@ function init() {
   form.addEventListener('input', render);
   [dynamicPricingUplift, seasonalityIndex, cityTaxRate, projectionYears, annualRevenueGrowth, annualCostGrowth]
     .forEach((el) => el && el.addEventListener('input', render));
+  if (fiscalityEnabledToggle) fiscalityEnabledToggle.addEventListener('change', onFiscalityToggleChange);
   registerBtn.addEventListener('click', registerAccount);
   loginBtn.addEventListener('click', loginAccount);
   logoutBtn.addEventListener('click', logoutAccount);
@@ -118,6 +121,7 @@ function init() {
   window.addEventListener('resize', onChartResize);
   syncAuthState().finally(render);
   applyInitialCityPreset();
+  updateFiscalityState();
   renderScenarios();
 }
 
@@ -133,6 +137,7 @@ function readInputs() {
   data.marginalTaxRate = clamp(data.marginalTaxRate, 0, 45);
   data.lmpSocialRate = clamp(data.lmpSocialRate, 0, 60);
   data.corporateTaxRate = clamp(data.corporateTaxRate, 0, 40);
+  data.fiscalityEnabled = fiscalityEnabledToggle ? fiscalityEnabledToggle.checked : true;
   return data;
 }
 
@@ -204,6 +209,23 @@ function computeBaseAirbnb(data, mod = { uplift: 0, seasonality: 1, cityTax: 0 }
 }
 
 function computeFiscalComparison(data, base, carryForwardReel = 0) {
+  if (!data.fiscalityEnabled) {
+    const net = base.annualNetBeforeTax;
+    return {
+      regimes: {
+        'lmnp-micro': { taxable: 0, tax: 0, netAfterTax: net },
+        'lmnp-reel': { taxable: 0, tax: 0, netAfterTax: net, carryForwardUsed: 0, carryForwardNext: 0 },
+        'lmp-micro': { taxable: 0, tax: 0, netAfterTax: net },
+        'lmp-reel': { taxable: 0, tax: 0, netAfterTax: net },
+        'sci-is': { taxable: 0, tax: 0, netAfterTax: net }
+      },
+      selectedMode: 'no-tax',
+      selectedTax: 0,
+      selectedNetAfterTax: net,
+      carryForwardNext: 0
+    };
+  }
+
   const taxRate = (data.marginalTaxRate + data.socialTaxRate) / 100;
   const lmpRate = (data.marginalTaxRate + data.lmpSocialRate) / 100;
   const corpRate = data.corporateTaxRate / 100;
@@ -736,6 +758,10 @@ function loadScenario(id) {
   if (projectionYears) projectionYears.value = String(scenario.controls?.years ?? projectionYears.value);
   if (annualRevenueGrowth) annualRevenueGrowth.value = String((scenario.controls?.revenueGrowth ?? 0) * 100);
   if (annualCostGrowth) annualCostGrowth.value = String((scenario.controls?.costGrowth ?? 0) * 100);
+  if (fiscalityEnabledToggle) {
+    fiscalityEnabledToggle.checked = scenario.inputs?.fiscalityEnabled !== false;
+    updateFiscalityState();
+  }
   render();
 }
 
@@ -1004,6 +1030,20 @@ function onCityPresetChange() {
 function onCityPresetApplyClick() {
   const key = String(cityPresetSelect?.value || 'none');
   applyCityPreset(key);
+}
+
+function onFiscalityToggleChange() {
+  updateFiscalityState();
+  render();
+}
+
+function updateFiscalityState() {
+  if (!fiscalVariablesWrap) return;
+  const enabled = fiscalityEnabledToggle ? fiscalityEnabledToggle.checked : true;
+  fiscalVariablesWrap.classList.toggle('fiscal-variables-disabled', !enabled);
+  fiscalVariablesWrap.querySelectorAll('input, select').forEach((el) => {
+    el.disabled = !enabled;
+  });
 }
 
 async function applyCityPreset(key, options = {}) {
@@ -1288,6 +1328,7 @@ function labelPlan(plan) {
 }
 
 function modeLabel(mode) {
+  if (mode === 'no-tax') return 'Fiscalite desactivee';
   if (mode === 'lmnp-micro') return 'LMNP Micro-BIC';
   if (mode === 'lmnp-reel') return 'LMNP Reel';
   if (mode === 'lmp-micro') return 'LMP Micro-BIC';

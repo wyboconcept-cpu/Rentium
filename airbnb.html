@@ -137,7 +137,11 @@
 
           <section class="form-section fiscal-section" aria-label="Reglages fiscalite Airbnb">
             <h3>Fiscalite Airbnb</h3>
-            <div class="form-grid-inner">
+            <label class="fiscal-toggle">
+              <input id="fiscalityEnabledToggle" type="checkbox" checked>
+              <span>Activer la fiscalite dans les calculs</span>
+            </label>
+            <div class="form-grid-inner fiscal-variables" id="fiscalVariablesWrap">
               <label>Taxe fonciere / an<input name="propertyTax" type="number" min="0" step="10" value="1600" required></label>
               <label>Assurance PNO / an<input name="annualInsuranceFixed" type="number" min="0" step="10" value="420" required></label>
               <label>CFE annuelle<input name="annualCfe" type="number" min="0" step="10" value="650" required></label>
