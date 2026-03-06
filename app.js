@@ -1016,10 +1016,17 @@ function renderScenarios() {
   }
 
   scenarios.forEach((s) => {
+    const preview = computeResults(s.inputs || {});
     const row = document.createElement('div');
     row.className = 'scenario-row';
     row.innerHTML = `
-      <label><input type="checkbox" class="compare-check" value="${s.id}"><span>${escapeHtml(s.name)}</span></label>
+      <label>
+        <input type="checkbox" class="compare-check" value="${s.id}">
+        <span class="scenario-main">
+          <strong>${escapeHtml(s.name)}</strong>
+          <small>Cashflow net: ${formatCurrency(preview.monthlyCashflow)} / mois</small>
+        </span>
+      </label>
       <div class="row-actions"><button type="button" data-load="${s.id}">Charger</button><button type="button" data-delete="${s.id}">Supprimer</button></div>
     `;
     scenariosList.appendChild(row);

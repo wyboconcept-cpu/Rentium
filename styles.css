@@ -429,8 +429,22 @@ button:disabled {
 
 .scenario-row label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+}
+
+.scenario-main {
+  display: grid;
+  gap: 2px;
+}
+
+.scenario-main strong {
+  font-weight: 600;
+}
+
+.scenario-main small {
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .row-actions {
