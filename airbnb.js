@@ -208,11 +208,6 @@ function computeBaseAirbnb(data, mod = { uplift: 0, seasonality: 1, cityTax: 0 }
 
   const operatingCashCosts = (data.fixedMonthlyCosts * 12)
     + consumables
-    + data.propertyTax
-    + data.annualInsuranceFixed
-    + data.annualCfe
-    + data.annualAccountingFees
-    + data.annualDeductibleWorks
     + platformFees
     + conciergeFees
     + cityTaxAnnual;
@@ -242,7 +237,7 @@ function computeBaseAirbnb(data, mod = { uplift: 0, seasonality: 1, cityTax: 0 }
   };
 }
 
-function computeFiscalComparison(data, base, carryForwardReel = 0) {
+function computeFiscalComparison(data, base, carryForwardReel = 0, annualFiscalCashCostsOverride = null) {
   if (!data.fiscalityEnabled) {
     const net = base.annualNetBeforeTax;
     return {
@@ -260,17 +255,20 @@ function computeFiscalComparison(data, base, carryForwardReel = 0) {
     };
   }
 
+  const annualFiscalCashCosts = annualFiscalCashCostsOverride ?? computeAnnualFiscalCashCosts(data);
+  const annualNetAfterFiscalChargesBeforeTax = base.annualNetBeforeTax - annualFiscalCashCosts;
   const taxRate = (data.marginalTaxRate + data.socialTaxRate) / 100;
   const lmpRate = (data.marginalTaxRate + data.lmpSocialRate) / 100;
   const corpRate = data.corporateTaxRate / 100;
-  const amortization = data.annualBuildingAmortization + data.annualFurnitureAmortization;
+  const amortization = computeAnnualAmortization(data);
   
   const lmnpMicroTaxable = Math.max(base.grossRevenue * 0.5, 0);
   const lmnpMicroTax = lmnpMicroTaxable * taxRate;
-  const lmnpMicroNetAfterTax = base.annualNetBeforeTax - lmnpMicroTax;
+  const lmnpMicroNetAfterTax = annualNetAfterFiscalChargesBeforeTax - lmnpMicroTax;
 
   const lmnpReelRawTaxable = base.grossRevenue
     - base.operatingCashCosts
+    - annualFiscalCashCosts
     - base.annualInterest
     - base.annualLoanInsurance
     - amortization;
@@ -278,29 +276,31 @@ function computeFiscalComparison(data, base, carryForwardReel = 0) {
   const lmnpReelTaxable = Math.max(lmnpReelAfterCarry, 0);
   const lmnpReelCarryForwardNext = lmnpReelAfterCarry < 0 ? Math.abs(lmnpReelAfterCarry) : 0;
   const lmnpReelTax = lmnpReelTaxable * taxRate;
-  const lmnpReelNetAfterTax = base.annualNetBeforeTax - lmnpReelTax;
+  const lmnpReelNetAfterTax = annualNetAfterFiscalChargesBeforeTax - lmnpReelTax;
 
   const lmpMicroTaxable = Math.max(base.grossRevenue * 0.5, 0);
   const lmpMicroTax = lmpMicroTaxable * lmpRate;
-  const lmpMicroNetAfterTax = base.annualNetBeforeTax - lmpMicroTax;
+  const lmpMicroNetAfterTax = annualNetAfterFiscalChargesBeforeTax - lmpMicroTax;
 
   const lmpReelRawTaxable = base.grossRevenue
     - base.operatingCashCosts
+    - annualFiscalCashCosts
     - base.annualInterest
     - base.annualLoanInsurance
     - amortization;
   const lmpReelTaxable = Math.max(lmpReelRawTaxable, 0);
   const lmpReelTax = lmpReelTaxable * lmpRate;
-  const lmpReelNetAfterTax = base.annualNetBeforeTax - lmpReelTax;
+  const lmpReelNetAfterTax = annualNetAfterFiscalChargesBeforeTax - lmpReelTax;
 
   const sciIsRawTaxable = base.grossRevenue
     - base.operatingCashCosts
+    - annualFiscalCashCosts
     - base.annualInterest
     - base.annualLoanInsurance
     - amortization;
   const sciIsTaxable = Math.max(sciIsRawTaxable, 0);
   const sciIsTax = sciIsTaxable * corpRate;
-  const sciIsNetAfterTax = base.annualNetBeforeTax - sciIsTax;
+  const sciIsNetAfterTax = annualNetAfterFiscalChargesBeforeTax - sciIsTax;
 
   const regimes = {
     'lmnp-micro': { taxable: lmnpMicroTaxable, tax: lmnpMicroTax, netAfterTax: lmnpMicroNetAfterTax },
@@ -329,7 +329,8 @@ function computeFiscalComparison(data, base, carryForwardReel = 0) {
     selectedMode: preferred,
     selectedTax,
     selectedNetAfterTax,
-    carryForwardNext: lmnpReelCarryForwardNext
+    carryForwardNext: lmnpReelCarryForwardNext,
+    annualFiscalCashCosts
   };
 }
 
@@ -337,6 +338,7 @@ function computeProjection(data, base, controls) {
   const rows = [];
   let carryForwardReel = 0;
   let cumulative = 0;
+  const fiscalCashCostsBase = computeAnnualFiscalCashCosts(data);
 
   for (let year = 1; year <= controls.years; year += 1) {
     const growthRevenueFactor = (1 + controls.revenueGrowth) ** (year - 1);
@@ -348,6 +350,7 @@ function computeProjection(data, base, controls) {
 
     const grossRevenue = (base.annualRoomRevenue + base.annualCleaningRevenue) * growthRevenueFactor;
     const operatingCashCosts = base.operatingCashCosts * growthCostFactor;
+    const annualFiscalCashCosts = fiscalCashCostsBase * growthCostFactor;
     const annualNetBeforeTax = grossRevenue - operatingCashCosts - debt;
 
     const yearBase = {
@@ -360,7 +363,7 @@ function computeProjection(data, base, controls) {
       annualRoomRevenue: base.annualRoomRevenue * growthRevenueFactor,
       annualCleaningRevenue: base.annualCleaningRevenue * growthRevenueFactor
     };
-    const yearFiscal = computeFiscalComparison(data, yearBase, carryForwardReel);
+    const yearFiscal = computeFiscalComparison(data, yearBase, carryForwardReel, annualFiscalCashCosts);
     const selectedMode = yearFiscal.selectedMode;
     const selectedTax = yearFiscal.selectedTax;
     const selectedNetAfterTax = yearFiscal.selectedNetAfterTax;
@@ -372,6 +375,7 @@ function computeProjection(data, base, controls) {
       year,
       grossRevenue,
       operatingCashCosts,
+      annualFiscalCashCosts,
       selectedTax,
       selectedNetAfterTax,
       cumulative,
@@ -443,18 +447,23 @@ function render() {
 
   renderMetric('Revenus annuels Airbnb', formatCurrency(base.grossRevenue));
   renderMetric('Charges exploitation annuelles', formatCurrency(base.operatingCashCosts));
+  if (data.fiscalityEnabled) renderMetric('Charges fiscales annuelles', formatCurrency(fiscal.annualFiscalCashCosts || 0));
   renderMetric('Interets annuels (annee 1)', formatCurrency(base.annualInterest));
   renderMetric('Cashflow mensuel avant impot', formatCurrency(base.monthlyNetBeforeTax));
   renderMetric(`Net mensuel apres impot (${modeLabel(fiscal.selectedMode)})`, formatCurrency(fiscal.selectedNetAfterTax / 12));
   renderMetric('Marge avant impot', formatPercent(base.netMargin));
   renderMetric('Nuits louees / an', `${Math.round(base.nightsBooked)} nuits`);
 
-  fiscalArea.hidden = false;
-  ['lmnp-micro', 'lmnp-reel', 'lmp-micro', 'lmp-reel', 'sci-is'].forEach((key) => {
-    const item = fiscal.regimes[key];
-    if (!item) return;
-    renderCompareCard(modeLabel(key), item.taxable, item.tax, item.netAfterTax, fiscal.selectedMode === key);
-  });
+  if (data.fiscalityEnabled) {
+    fiscalArea.hidden = false;
+    ['lmnp-micro', 'lmnp-reel', 'lmp-micro', 'lmp-reel', 'sci-is'].forEach((key) => {
+      const item = fiscal.regimes[key];
+      if (!item) return;
+      renderCompareCard(modeLabel(key), item.taxable, item.tax, item.netAfterTax, fiscal.selectedMode === key);
+    });
+  } else {
+    fiscalArea.hidden = true;
+  }
 
   if (recoArea && recoList) {
     const recos = generateInvestmentRecommendations(data, {
@@ -925,6 +934,20 @@ function computeMonthlyAfterTax(data, controls) {
   const base = computeBaseAirbnb(data, controls);
   const fiscal = computeFiscalComparison(data, base);
   return fiscal.selectedNetAfterTax / 12;
+}
+
+function computeAnnualFiscalCashCosts(data) {
+  if (!data.fiscalityEnabled) return 0;
+  return (Number(data.propertyTax || 0)
+    + Number(data.annualInsuranceFixed || 0)
+    + Number(data.annualCfe || 0)
+    + Number(data.annualAccountingFees || 0)
+    + Number(data.annualDeductibleWorks || 0));
+}
+
+function computeAnnualAmortization(data) {
+  if (!data.fiscalityEnabled) return 0;
+  return Number(data.annualBuildingAmortization || 0) + Number(data.annualFurnitureAmortization || 0);
 }
 
 function computeAirbnbUncertaintyRange(data, controls) {
