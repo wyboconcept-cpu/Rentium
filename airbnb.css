@@ -297,6 +297,48 @@ label {
   gap: 8px;
 }
 
+.scenario-compare {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.scenario-compare input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #48626d;
+  border-radius: 6px;
+  background: #0f171c;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 130ms ease;
+}
+
+.scenario-compare input[type="checkbox"]::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--accent);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+.scenario-compare input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 122, 61, 0.18);
+}
+
+.scenario-compare input[type="checkbox"]:checked::after {
+  transform: scale(1);
+}
+
 .legal-card-airbnb {
   margin-top: 14px;
 }
@@ -336,10 +378,14 @@ label {
 
 #airbnbChart {
   width: 100%;
-  height: auto;
+  height: 460px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #111a20;
+}
+
+.chart-card {
+  margin-top: 14px;
 }
 
 .pricing-modal {
@@ -405,5 +451,9 @@ th {
   .compare-grid,
   .pricing-grid {
     grid-template-columns: 1fr;
+  }
+
+  #airbnbChart {
+    height: 340px;
   }
 }

@@ -24,6 +24,8 @@ const chartFocus = document.getElementById('chartFocus');
 const exportPdfBtn = document.getElementById('exportPdfBtn');
 const saveScenarioBtn = document.getElementById('saveScenarioBtn');
 const scenariosList = document.getElementById('scenariosList');
+const compareScenariosBtn = document.getElementById('compareScenariosBtn');
+const comparisonArea = document.getElementById('comparisonArea');
 const cityPresetSelect = document.getElementById('cityPresetSelect');
 const applyCityPresetBtn = document.getElementById('applyCityPresetBtn');
 const cityDataInfo = document.getElementById('cityDataInfo');
@@ -48,6 +50,7 @@ let airbnbScenarios = readSavedAirbnbScenarios();
 let chartRows = [];
 let chartHoverIndex = null;
 let chartLayout = null;
+let selectedScenarioIds = new Set();
 
 const CITY_OFFICIAL_PRESETS = {
   paris: {
@@ -103,12 +106,15 @@ function init() {
   if (pricingModal) pricingModal.addEventListener('click', onPricingModalClick);
   document.addEventListener('click', onPlanSelectClick);
   if (scenariosList) scenariosList.addEventListener('click', onScenariosClick);
+  if (scenariosList) scenariosList.addEventListener('change', onScenariosChange);
+  if (compareScenariosBtn) compareScenariosBtn.addEventListener('click', renderScenariosComparison);
   if (cityPresetSelect) cityPresetSelect.addEventListener('change', onCityPresetChange);
   if (applyCityPresetBtn) applyCityPresetBtn.addEventListener('click', onCityPresetApplyClick);
   if (airbnbChart) {
     airbnbChart.addEventListener('mousemove', onChartHoverMove);
     airbnbChart.addEventListener('mouseleave', onChartHoverLeave);
   }
+  window.addEventListener('resize', onChartResize);
   syncAuthState().finally(render);
   applyInitialCityPreset();
   renderScenarios();
@@ -465,9 +471,10 @@ function render() {
 function renderChart(rows) {
   if (!airbnbChart) return;
   chartRows = rows || [];
-  const ctx = airbnbChart.getContext('2d');
-  const width = airbnbChart.width;
-  const height = airbnbChart.height;
+  const canvas = resizeAirbnbChartCanvas();
+  const ctx = canvas.ctx;
+  const width = canvas.cssWidth;
+  const height = canvas.cssHeight;
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = '#111a20';
   ctx.fillRect(0, 0, width, height);
@@ -487,7 +494,7 @@ function renderChart(rows) {
   const minY = Math.min(...all);
   const maxY = Math.max(...all);
   const range = maxY - minY || 1;
-  chartLayout = { width, height, padLeft, padRight, padTop, padBottom, minY, range, count: rows.length };
+  chartLayout = { width, height, padLeft, padRight, padTop, padBottom, minY, range, count: rows.length, plotW, plotH };
 
   for (let i = 0; i <= 5; i += 1) {
     const y = padTop + (plotH * i) / 5;
@@ -572,7 +579,7 @@ function onChartHoverMove(event) {
   if (!chartLayout || !chartRows.length) return;
   const rect = airbnbChart.getBoundingClientRect();
   const x = event.clientX - rect.left;
-  const usable = chartLayout.width - chartLayout.padLeft - chartLayout.padRight;
+  const usable = chartLayout.plotW;
   const ratio = clamp((x - chartLayout.padLeft) / Math.max(usable, 1), 0, 1);
   chartHoverIndex = Math.round(ratio * (chartLayout.count - 1));
   renderChart(chartRows);
@@ -586,6 +593,27 @@ function onChartHoverLeave() {
 function toChartX(index, count, width, padLeft, padRight) {
   if (count <= 1) return padLeft;
   return padLeft + (index / (count - 1)) * (width - padLeft - padRight);
+}
+
+function resizeAirbnbChartCanvas() {
+  const ctx = airbnbChart.getContext('2d');
+  const dpr = Math.max(window.devicePixelRatio || 1, 1);
+  const cssWidth = Math.max(Math.round(airbnbChart.clientWidth || 960), 320);
+  const cssHeight = Math.max(Number(airbnbChart.dataset.chartHeight || 460), 320);
+  const internalWidth = Math.round(cssWidth * dpr);
+  const internalHeight = Math.round(cssHeight * dpr);
+
+  if (airbnbChart.width !== internalWidth || airbnbChart.height !== internalHeight) {
+    airbnbChart.width = internalWidth;
+    airbnbChart.height = internalHeight;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, cssWidth, cssHeight };
+}
+
+function onChartResize() {
+  if (!chartRows.length) return;
+  renderChart(chartRows);
 }
 
 function exportPdfReport() {
@@ -643,7 +671,9 @@ function saveScenario() {
     createdAt: new Date().toISOString(),
     inputs: data,
     controls,
-    previewMonthlyAfterTax: evalData.monthlyAfterTax
+    previewMonthlyAfterTax: evalData.monthlyAfterTax,
+    previewScore: evalData.score,
+    previewMode: evalData.selectedMode
   };
   airbnbScenarios.unshift(scenario);
   airbnbScenarios = airbnbScenarios.slice(0, 100);
@@ -662,6 +692,24 @@ function onScenariosClick(event) {
   if (delBtn) {
     deleteScenario(String(delBtn.getAttribute('data-delete-scenario') || ''));
   }
+}
+
+function onScenariosChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (target.type !== 'checkbox' || !target.hasAttribute('data-compare-scenario')) return;
+  const scenarioId = String(target.getAttribute('data-compare-scenario') || '');
+  if (!scenarioId) return;
+  if (target.checked) {
+    if (selectedScenarioIds.size >= 3) {
+      target.checked = false;
+      return;
+    }
+    selectedScenarioIds.add(scenarioId);
+  } else {
+    selectedScenarioIds.delete(scenarioId);
+  }
+  renderScenarios();
 }
 
 function loadScenario(id) {
@@ -684,22 +732,36 @@ function loadScenario(id) {
 
 function deleteScenario(id) {
   airbnbScenarios = airbnbScenarios.filter((s) => s.id !== id);
+  selectedScenarioIds.delete(id);
   persistAirbnbScenarios();
   renderScenarios();
 }
 
 function renderScenarios() {
   if (!scenariosList) return;
+  selectedScenarioIds = new Set([...selectedScenarioIds].filter((id) => airbnbScenarios.some((scenario) => scenario.id === id)));
+  if (compareScenariosBtn) {
+    const selectedCount = selectedScenarioIds.size;
+    compareScenariosBtn.disabled = selectedCount < 2 || selectedCount > 3;
+    compareScenariosBtn.textContent = selectedCount
+      ? `Comparer (${selectedCount}/3)`
+      : 'Comparer (2-3)';
+  }
   if (!airbnbScenarios.length) {
     scenariosList.innerHTML = '<p class="note">Aucun scenario Airbnb sauvegarde.</p>';
+    if (comparisonArea) comparisonArea.innerHTML = '';
     return;
   }
 
   scenariosList.innerHTML = airbnbScenarios.map((scenario) => `
     <article class="scenario-row">
       <div>
+        <label class="scenario-compare">
+          <input type="checkbox" data-compare-scenario="${escapeHtml(scenario.id)}" ${selectedScenarioIds.has(scenario.id) ? 'checked' : ''}>
+          <span>Ajouter a la comparaison</span>
+        </label>
         <h4>${escapeHtml(scenario.name)}</h4>
-        <p>Cashflow net apercu: <strong>${escapeHtml(formatCurrency(scenario.previewMonthlyAfterTax || 0))} / mois</strong> | ${new Date(scenario.createdAt).toLocaleString('fr-FR')}</p>
+        <p>Cashflow net apercu: <strong>${escapeHtml(formatCurrency(scenario.previewMonthlyAfterTax || 0))} / mois</strong> | Score: <strong>${Math.round(Number(scenario.previewScore || 0))}/100</strong> | Regime: <strong>${escapeHtml(modeLabel(scenario.previewMode || 'auto'))}</strong> | ${new Date(scenario.createdAt).toLocaleString('fr-FR')}</p>
       </div>
       <div class="scenario-actions">
         <button type="button" class="ghost" data-load-scenario="${escapeHtml(scenario.id)}">Charger</button>
@@ -707,6 +769,53 @@ function renderScenarios() {
       </div>
     </article>
   `).join('');
+
+  renderScenariosComparison();
+}
+
+function renderScenariosComparison() {
+  if (!comparisonArea) return;
+  const selected = airbnbScenarios.filter((scenario) => selectedScenarioIds.has(scenario.id)).slice(0, 3);
+  if (selected.length < 2) {
+    comparisonArea.innerHTML = '<p class="note">Selectionne 2 a 3 scenarios pour afficher le comparateur.</p>';
+    return;
+  }
+
+  const evaluated = selected.map((scenario) => {
+    const data = scenario.inputs || {};
+    const controls = scenario.controls || readProControls();
+    const base = computeBaseAirbnb(data, controls);
+    const fiscal = computeFiscalComparison(data, base);
+    const projection = computeProjection(data, base, controls);
+    return {
+      name: scenario.name,
+      annualRevenue: base.grossRevenue,
+      annualCosts: base.operatingCashCosts,
+      annualTax: fiscal.selectedTax,
+      monthlyAfterTax: fiscal.selectedNetAfterTax / 12,
+      score: projection.score,
+      mode: fiscal.selectedMode
+    };
+  });
+
+  comparisonArea.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Indicateur</th>
+          ${evaluated.map((item) => `<th>${escapeHtml(item.name)}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Cashflow net / mois</td>${evaluated.map((item) => `<td>${escapeHtml(formatCurrency(item.monthlyAfterTax))}</td>`).join('')}</tr>
+        <tr><td>Revenus annuels</td>${evaluated.map((item) => `<td>${escapeHtml(formatCurrency(item.annualRevenue))}</td>`).join('')}</tr>
+        <tr><td>Charges annuelles</td>${evaluated.map((item) => `<td>${escapeHtml(formatCurrency(item.annualCosts))}</td>`).join('')}</tr>
+        <tr><td>Impot annuel</td>${evaluated.map((item) => `<td>${escapeHtml(formatCurrency(item.annualTax))}</td>`).join('')}</tr>
+        <tr><td>Regime retenu</td>${evaluated.map((item) => `<td>${escapeHtml(modeLabel(item.mode))}</td>`).join('')}</tr>
+        <tr><td>Airbnb Score Pro</td>${evaluated.map((item) => `<td>${Math.round(item.score)}/100</td>`).join('')}</tr>
+      </tbody>
+    </table>
+  `;
 }
 
 function readSavedAirbnbScenarios() {

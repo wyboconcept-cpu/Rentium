@@ -96,7 +96,11 @@
         <p id="cityDataInfo" class="note"></p>
         <section class="pro-area" id="scenariosArea">
           <h3>Scenarios Airbnb sauvegardes</h3>
+          <div class="result-actions">
+            <button id="compareScenariosBtn" type="button" class="ghost">Comparer (2-3)</button>
+          </div>
           <div id="scenariosList" class="scenario-list"></div>
+          <div id="comparisonArea" class="table-wrap"></div>
         </section>
       </section>
 
@@ -144,13 +148,14 @@
             </table>
           </div>
         </section>
-        <section class="pro-area" id="chartArea">
-          <h3>Graphique des flux</h3>
-          <canvas id="airbnbChart" width="880" height="300"></canvas>
-          <p id="chartFocus" class="note">Projection annuelle: net apres impot et cumul.</p>
-        </section>
       </section>
     </div>
+
+    <section class="card chart-card pro-area" id="chartArea">
+      <h3>Graphique des flux</h3>
+      <canvas id="airbnbChart" width="1200" height="460"></canvas>
+      <p id="chartFocus" class="note">Projection annuelle: net apres impot et cumul.</p>
+    </section>
 
     <section class="card legal-card-airbnb">
       <h2>Mentions legales et limites</h2>
