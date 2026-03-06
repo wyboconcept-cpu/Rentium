@@ -126,11 +126,45 @@ function init() {
 }
 
 function readInputs() {
-  const fd = new FormData(form);
   const data = {};
-  for (const [k, v] of fd.entries()) data[k] = Number(v || 0);
+  const numericFields = [
+    'purchasePrice',
+    'downPayment',
+    'interestRate',
+    'loanYears',
+    'insuranceRate',
+    'nightlyRate',
+    'occupancyRate',
+    'openDays',
+    'turnoversPerMonth',
+    'cleaningFeeCharged',
+    'platformFeeRate',
+    'conciergeRate',
+    'fixedMonthlyCosts',
+    'suppliesPerTurnover',
+    'propertyTax',
+    'annualInsuranceFixed',
+    'annualCfe',
+    'annualAccountingFees',
+    'annualDeductibleWorks',
+    'annualBuildingAmortization',
+    'annualFurnitureAmortization',
+    'marginalTaxRate',
+    'socialTaxRate',
+    'lmpSocialRate',
+    'corporateTaxRate'
+  ];
 
-  data.fiscalMode = normalizeFiscalMode(fd.get('fiscalMode'));
+  numericFields.forEach((field) => {
+    const el = form.elements.namedItem(field);
+    if (el instanceof HTMLInputElement) {
+      data[field] = Number(el.value || 0);
+    }
+  });
+
+  const fiscalModeEl = form.elements.namedItem('fiscalMode');
+  const fiscalModeRaw = fiscalModeEl instanceof HTMLSelectElement ? fiscalModeEl.value : 'auto';
+  data.fiscalMode = normalizeFiscalMode(fiscalModeRaw);
   data.occupancyRate = clamp(data.occupancyRate, 0, 100);
   data.openDays = clamp(data.openDays, 1, 365);
   data.socialTaxRate = clamp(data.socialTaxRate, 0, 30);
