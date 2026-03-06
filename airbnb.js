@@ -18,6 +18,10 @@ const proMetrics = document.getElementById('proMetrics');
 const proArea = document.getElementById('proArea');
 const lockNotice = document.getElementById('lockNotice');
 const projectionBody = document.getElementById('projectionBody');
+const chartArea = document.getElementById('chartArea');
+const airbnbChart = document.getElementById('airbnbChart');
+const chartFocus = document.getElementById('chartFocus');
+const exportPdfBtn = document.getElementById('exportPdfBtn');
 const cityPresetSelect = document.getElementById('cityPresetSelect');
 const applyCityPresetBtn = document.getElementById('applyCityPresetBtn');
 const cityDataInfo = document.getElementById('cityDataInfo');
@@ -36,6 +40,7 @@ const annualCostGrowth = document.getElementById('annualCostGrowth');
 let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
 let currentUser = null;
 let currentPlan = 'free';
+let lastReport = null;
 
 const CITY_OFFICIAL_PRESETS = {
   paris: {
@@ -84,6 +89,7 @@ function init() {
   registerBtn.addEventListener('click', registerAccount);
   loginBtn.addEventListener('click', loginAccount);
   logoutBtn.addEventListener('click', logoutAccount);
+  if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportPdfReport);
   if (openPricingBtn) openPricingBtn.addEventListener('click', openPricingModal);
   if (closePricingBtn) closePricingBtn.addEventListener('click', closePricingModal);
   if (pricingModal) pricingModal.addEventListener('click', onPricingModalClick);
@@ -332,6 +338,7 @@ function render() {
 
   const hasEssential = currentPlan === 'essential' || currentPlan === 'pro';
   const hasPro = currentPlan === 'pro';
+  if (exportPdfBtn) exportPdfBtn.disabled = !hasEssential;
 
   planState.textContent = `Plan actif: ${labelPlan(currentPlan)}`;
   lockNotice.textContent = hasEssential
@@ -346,9 +353,11 @@ function render() {
   fiscalArea.hidden = true;
   if (recoArea) recoArea.hidden = true;
   proArea.hidden = true;
+  if (chartArea) chartArea.hidden = true;
 
   if (!hasEssential) {
     renderMetric('Acces', 'Plan payant requis');
+    if (chartFocus) chartFocus.textContent = 'Graphique disponible a partir du plan Essentiel.';
     return;
   }
 
@@ -380,6 +389,22 @@ function render() {
     renderRecommendations(recos);
   }
 
+  const chartControls = hasPro
+    ? controls
+    : { uplift: 0, seasonality: 1, cityTax: 0, years: 10, revenueGrowth: 0, costGrowth: 0 };
+  const chartBase = computeBaseAirbnb(data, chartControls);
+  const chartProjection = computeProjection(data, chartBase, chartControls);
+  if (chartArea) chartArea.hidden = false;
+  renderChart(chartProjection.rows);
+  lastReport = {
+    generatedAt: new Date().toISOString(),
+    plan: currentPlan,
+    base,
+    fiscal,
+    projection: chartProjection,
+    controls: chartControls
+  };
+
   if (!hasPro) return;
 
   proArea.hidden = false;
@@ -410,6 +435,119 @@ function render() {
     const proRecos = generateInvestmentRecommendations(data, controls, proBaselineEval, 8);
     renderRecommendations(proRecos);
   }
+  lastReport = {
+    generatedAt: new Date().toISOString(),
+    plan: currentPlan,
+    base: baseWithProControls,
+    fiscal: computeFiscalComparison(data, baseWithProControls),
+    projection,
+    controls
+  };
+}
+
+function renderChart(rows) {
+  if (!airbnbChart) return;
+  const ctx = airbnbChart.getContext('2d');
+  const width = airbnbChart.width;
+  const height = airbnbChart.height;
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#111a20';
+  ctx.fillRect(0, 0, width, height);
+  if (!rows || !rows.length) return;
+
+  const padLeft = 58;
+  const padRight = 20;
+  const padTop = 20;
+  const padBottom = 34;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+
+  const netSeries = rows.map((r) => r.selectedNetAfterTax);
+  const cumSeries = rows.map((r) => r.cumulative);
+  const all = [...netSeries, ...cumSeries, 0];
+  const minY = Math.min(...all);
+  const maxY = Math.max(...all);
+  const range = maxY - minY || 1;
+
+  for (let i = 0; i <= 5; i += 1) {
+    const y = padTop + (plotH * i) / 5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.moveTo(padLeft, y);
+    ctx.lineTo(width - padRight, y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#36515b';
+  ctx.beginPath();
+  ctx.moveTo(padLeft, padTop);
+  ctx.lineTo(padLeft, height - padBottom);
+  ctx.lineTo(width - padRight, height - padBottom);
+  ctx.stroke();
+
+  drawSeries(ctx, netSeries, '#ff7a3d', rows.length, { padLeft, padRight, padTop, padBottom, width, height, minY, range });
+  drawSeries(ctx, cumSeries, '#15b7aa', rows.length, { padLeft, padRight, padTop, padBottom, width, height, minY, range });
+
+  ctx.fillStyle = '#a8bdc3';
+  ctx.font = '12px Outfit';
+  ctx.fillText('Net apres impot', padLeft + 8, padTop + 12);
+  ctx.fillStyle = '#15b7aa';
+  ctx.fillText('Cumul', padLeft + 130, padTop + 12);
+
+  if (chartFocus) {
+    const last = rows[rows.length - 1];
+    chartFocus.textContent = `Annee ${last.year}: Net ${formatCurrency(last.selectedNetAfterTax)} | Cumul ${formatCurrency(last.cumulative)}`;
+  }
+}
+
+function drawSeries(ctx, values, color, count, layout) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  values.forEach((value, idx) => {
+    const x = layout.padLeft + (count <= 1 ? 0 : (idx / (count - 1)) * (layout.width - layout.padLeft - layout.padRight));
+    const y = layout.height - layout.padBottom - ((value - layout.minY) / layout.range) * (layout.height - layout.padTop - layout.padBottom);
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function exportPdfReport() {
+  if (!lastReport) return;
+  const chartImage = airbnbChart ? airbnbChart.toDataURL('image/png') : '';
+  const rows = lastReport.projection?.rows || [];
+  const win = window.open('', '_blank');
+  if (!win) return;
+  const html = `
+<!doctype html><html><head><meta charset="utf-8"><title>Rapport Airbnb Rentium</title>
+<style>
+body{font-family:Arial,sans-serif;padding:20px;color:#111}
+h1{margin:0 0 8px} h2{margin:16px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #ddd;padding:6px;text-align:left}
+.kpi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.box{border:1px solid #ddd;padding:8px;border-radius:8px}
+</style></head><body>
+<h1>Rentium Airbnb - Rapport</h1>
+<p>Genere le ${new Date(lastReport.generatedAt).toLocaleString('fr-FR')}</p>
+<div class="kpi">
+  <div class="box"><strong>Plan</strong><br>${escapeHtml(labelPlan(lastReport.plan))}</div>
+  <div class="box"><strong>Net mensuel apres impot</strong><br>${escapeHtml(formatCurrency((lastReport.fiscal?.selectedNetAfterTax || 0) / 12))}</div>
+  <div class="box"><strong>Cumul projection</strong><br>${escapeHtml(formatCurrency(lastReport.projection?.totalAfterTax || 0))}</div>
+</div>
+${chartImage ? `<h2>Graphique</h2><img src="${chartImage}" style="max-width:100%;border:1px solid #ddd;border-radius:8px;" />` : ''}
+<h2>Projection</h2>
+<table><thead><tr><th>Annee</th><th>CA</th><th>Charges</th><th>Impot</th><th>Net apres impot</th><th>Cumul</th></tr></thead>
+<tbody>
+${rows.map((row) => `<tr><td>${row.year}</td><td>${formatCurrency(row.grossRevenue)}</td><td>${formatCurrency(row.operatingCashCosts)}</td><td>${formatCurrency(row.selectedTax)}</td><td>${formatCurrency(row.selectedNetAfterTax)}</td><td>${formatCurrency(row.cumulative)}</td></tr>`).join('')}
+</tbody></table>
+</body></html>`;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
 }
 
 function evaluateScenario(data, controls) {

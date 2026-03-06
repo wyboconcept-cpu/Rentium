@@ -169,6 +169,12 @@ label {
   gap: 8px;
 }
 
+.result-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
 .metric {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -267,6 +273,14 @@ label {
 .table-wrap {
   margin-top: 10px;
   overflow: auto;
+}
+
+#airbnbChart {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #111a20;
 }
 
 .pricing-modal {
