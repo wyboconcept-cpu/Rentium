@@ -17,6 +17,7 @@ const recoList = document.getElementById('recoList');
 const proMetrics = document.getElementById('proMetrics');
 const proArea = document.getElementById('proArea');
 const lockNotice = document.getElementById('lockNotice');
+const uncertaintyBox = document.getElementById('uncertaintyBox');
 const projectionBody = document.getElementById('projectionBody');
 const chartArea = document.getElementById('chartArea');
 const airbnbChart = document.getElementById('airbnbChart');
@@ -379,6 +380,7 @@ function render() {
   if (!hasEssential) {
     renderMetric('Acces', 'Plan payant requis');
     if (chartFocus) chartFocus.textContent = 'Graphique disponible a partir du plan Essentiel.';
+    if (uncertaintyBox) uncertaintyBox.textContent = 'Marge d erreur estimee disponible a partir du plan Essentiel.';
     renderScenarios();
     return;
   }
@@ -416,6 +418,8 @@ function render() {
     : { uplift: 0, seasonality: 1, cityTax: 0, years: 10, revenueGrowth: 0, costGrowth: 0 };
   const chartBase = computeBaseAirbnb(data, chartControls);
   const chartProjection = computeProjection(data, chartBase, chartControls);
+  const baseUncertainty = computeAirbnbUncertaintyRange(data, chartControls);
+  renderUncertainty(baseUncertainty);
   if (chartArea) chartArea.hidden = false;
   renderChart(chartProjection.rows);
   lastReport = {
@@ -424,7 +428,8 @@ function render() {
     base,
     fiscal,
     projection: chartProjection,
-    controls: chartControls
+    controls: chartControls,
+    uncertainty: baseUncertainty
   };
 
   if (!hasPro) return;
@@ -432,6 +437,8 @@ function render() {
   proArea.hidden = false;
   const baseWithProControls = computeBaseAirbnb(data, controls);
   const projection = computeProjection(data, baseWithProControls, controls);
+  const proUncertainty = computeAirbnbUncertaintyRange(data, controls);
+  renderUncertainty(proUncertainty);
 
   renderProMetric('CA ajuste annee 1', formatCurrency(baseWithProControls.grossRevenue));
   renderProMetric('Taxe de sejour estimee', formatCurrency(baseWithProControls.cityTaxAnnual));
@@ -463,7 +470,8 @@ function render() {
     base: baseWithProControls,
     fiscal: computeFiscalComparison(data, baseWithProControls),
     projection,
-    controls
+    controls,
+    uncertainty: proUncertainty
   };
   renderScenarios();
 }
@@ -642,6 +650,7 @@ th,td{border:1px solid #ddd;padding:6px;text-align:left}
   <div class="box"><strong>Net mensuel apres impot</strong><br>${escapeHtml(formatCurrency((lastReport.fiscal?.selectedNetAfterTax || 0) / 12))}</div>
   <div class="box"><strong>Cumul projection</strong><br>${escapeHtml(formatCurrency(lastReport.projection?.totalAfterTax || 0))}</div>
 </div>
+${lastReport.uncertainty ? `<p><strong>Marge d erreur estimee:</strong> ${escapeHtml(lastReport.uncertainty.message)}</p>` : ''}
 ${chartImage ? `<h2>Graphique</h2><img src="${chartImage}" style="max-width:100%;border:1px solid #ddd;border-radius:8px;" />` : ''}
 <h2>Projection</h2>
 <table><thead><tr><th>Annee</th><th>CA</th><th>Charges</th><th>Impot</th><th>Net apres impot</th><th>Cumul</th></tr></thead>
@@ -850,6 +859,57 @@ function evaluateScenario(data, controls) {
     score: projection.score,
     selectedMode: fiscal.selectedMode
   };
+}
+
+function computeMonthlyAfterTax(data, controls) {
+  const base = computeBaseAirbnb(data, controls);
+  const fiscal = computeFiscalComparison(data, base);
+  return fiscal.selectedNetAfterTax / 12;
+}
+
+function computeAirbnbUncertaintyRange(data, controls) {
+  const central = computeMonthlyAfterTax(data, controls);
+  const prudentData = {
+    ...data,
+    occupancyRate: clamp(data.occupancyRate - 8, 0, 100),
+    nightlyRate: data.nightlyRate * 0.9,
+    platformFeeRate: clamp(data.platformFeeRate + 1.5, 0, 30),
+    conciergeRate: clamp(data.conciergeRate + 2, 0, 40),
+    fixedMonthlyCosts: data.fixedMonthlyCosts * 1.12,
+    suppliesPerTurnover: data.suppliesPerTurnover * 1.15
+  };
+  const optimisticData = {
+    ...data,
+    occupancyRate: clamp(data.occupancyRate + 5, 0, 100),
+    nightlyRate: data.nightlyRate * 1.06,
+    platformFeeRate: clamp(data.platformFeeRate - 0.8, 0, 30),
+    conciergeRate: clamp(data.conciergeRate - 1.5, 0, 40),
+    fixedMonthlyCosts: data.fixedMonthlyCosts * 0.94,
+    suppliesPerTurnover: data.suppliesPerTurnover * 0.92
+  };
+
+  const prudent = computeMonthlyAfterTax(prudentData, controls);
+  const optimistic = computeMonthlyAfterTax(optimisticData, controls);
+  const low = Math.min(prudent, optimistic, central);
+  const high = Math.max(prudent, optimistic, central);
+  const spread = high - low;
+  const ref = Math.max(Math.abs(central), 1);
+  const spreadRatio = spread / ref;
+  const confidence = spreadRatio <= 0.2 ? 'elevee' : (spreadRatio <= 0.4 ? 'moyenne' : 'faible');
+
+  return {
+    low,
+    high,
+    central,
+    spread,
+    confidence,
+    message: `${formatCurrency(low)} a ${formatCurrency(high)} / mois (estimation centrale: ${formatCurrency(central)} / mois, confiance ${confidence})`
+  };
+}
+
+function renderUncertainty(range) {
+  if (!uncertaintyBox || !range) return;
+  uncertaintyBox.textContent = `Marge d erreur estimee (variantes de parametres): ${range.message}`;
 }
 
 function generateInvestmentRecommendations(data, controls, baseline, limit = 6) {

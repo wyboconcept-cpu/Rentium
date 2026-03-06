@@ -225,6 +225,16 @@ label {
   background: rgba(255, 122, 61, 0.08);
 }
 
+.uncertainty-box {
+  margin-bottom: 10px;
+  border: 1px dashed #48626d;
+  border-radius: 12px;
+  padding: 10px;
+  color: #c5d9de;
+  background: rgba(21, 183, 170, 0.08);
+  font-size: 0.9rem;
+}
+
 .pro-area {
   margin-top: 14px;
   border-top: 1px solid var(--border);
