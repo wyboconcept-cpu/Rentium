@@ -280,14 +280,18 @@ function computeAndRender() {
 function renderMetrics(results) {
   metricsContainer.innerHTML = '';
   metricConfig.forEach(([key, label]) => {
-    const node = metricTemplate.content.cloneNode(true);
-    const card = node.querySelector('.metric');
-    node.querySelector('h3').textContent = label;
-    node.querySelector('p').textContent = key.includes('Yield') ? formatPercent(results[key]) : formatCurrency(results[key]);
-    if (key === 'monthlyCashflow' && card) {
-      card.classList.add(cashflowToneClass(results[key], 'metric'));
-    }
-    metricsContainer.appendChild(node);
+    const card = document.createElement('article');
+    card.className = 'metric';
+    if (key === 'monthlyCashflow') card.classList.add(cashflowToneClass(results[key], 'metric'));
+
+    const title = document.createElement('h3');
+    title.textContent = label;
+    const value = document.createElement('p');
+    value.textContent = key.includes('Yield') ? formatPercent(results[key]) : formatCurrency(results[key]);
+
+    card.appendChild(title);
+    card.appendChild(value);
+    metricsContainer.appendChild(card);
   });
 }
 
