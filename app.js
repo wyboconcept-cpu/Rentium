@@ -38,8 +38,8 @@ const proCard = document.getElementById('proCard');
 const proPaneTax = document.getElementById('proPaneTax');
 const proPaneProjection = document.getElementById('proPaneProjection');
 const proPaneCompare = document.getElementById('proPaneCompare');
-const proPaneChart = document.getElementById('proPaneChart');
 const proPaneScore = document.getElementById('proPaneScore');
+const proChartCard = document.getElementById('proChartCard');
 const proChart = document.getElementById('proChart');
 const chartFocus = document.getElementById('chartFocus');
 const chartSeriesToggles = [...document.querySelectorAll('.chart-series-toggle')];
@@ -924,8 +924,8 @@ function renderProChart(rows) {
 
 function resizeChartCanvas() {
   const rect = proChart.getBoundingClientRect();
-  const cssWidth = Math.max(320, Math.round(rect.width || 880));
-  const cssHeight = Math.round(cssWidth * (280 / 880));
+  const cssWidth = Math.max(320, Math.round(rect.width || 960));
+  const cssHeight = Math.max(Number(proChart.dataset.chartHeight || 460), 320);
   const dpr = window.devicePixelRatio || 1;
 
   proChart.width = Math.round(cssWidth * dpr);
@@ -1281,6 +1281,7 @@ function updatePremiumState() {
   });
 
   proCard.hidden = !isProPlan();
+  if (proChartCard) proChartCard.hidden = !isProPlan();
   updatePlanTagline();
 
   if (planSelect.value === 'free') setStatus('Plan Gratuit actif: export/sauvegarde/comparaison reserves aux plans payants.');
@@ -1817,6 +1818,5 @@ function switchProTab(tab) {
   proPaneTax.classList.toggle('active', tab === 'tax');
   proPaneProjection.classList.toggle('active', tab === 'projection');
   proPaneCompare.classList.toggle('active', tab === 'compare');
-  proPaneChart.classList.toggle('active', tab === 'chart');
   proPaneScore.classList.toggle('active', tab === 'score');
 }

@@ -844,10 +844,14 @@ body.modal-open {
 
 #proChart {
   width: 100%;
-  height: auto;
+  height: 460px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #181511;
+}
+
+.pro-chart-card {
+  grid-column: 1 / -1;
 }
 
 .pro-pane .table-wrap {
@@ -919,6 +923,10 @@ body.modal-open {
   .chart-controls {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  #proChart {
+    height: 340px;
   }
 }
 

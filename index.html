@@ -211,23 +211,24 @@
         <button type="button" class="pro-tab" data-tab="tax">Fiscalite</button>
         <button type="button" class="pro-tab" data-tab="projection">Projection long terme</button>
         <button type="button" class="pro-tab" data-tab="compare">Comparateur de scenarios</button>
-        <button type="button" class="pro-tab" data-tab="chart">Visualisation graphique des flux</button>
       </nav>
 
       <section class="pro-pane" id="proPaneTax"></section>
       <section class="pro-pane" id="proPaneProjection"></section>
       <section class="pro-pane" id="proPaneCompare"></section>
-      <section class="pro-pane" id="proPaneChart">
-        <div class="chart-controls">
-          <label><input class="chart-series-toggle" type="checkbox" value="annualNet" checked> Cashflow net annuel</label>
-          <label><input class="chart-series-toggle" type="checkbox" value="cumulativeNet" checked> Cashflow net cumule</label>
-          <label><input class="chart-series-toggle" type="checkbox" value="netSaleValue" checked> Valeur nette revente</label>
-          <label><input class="chart-series-toggle" type="checkbox" value="totalWithExit" checked> Total theorique avec sortie</label>
-        </div>
-        <canvas id="proChart" width="880" height="280"></canvas>
-        <p id="chartFocus" class="pro-hint">Survole le graphique pour voir le detail par annee.</p>
-      </section>
       <section class="pro-pane active" id="proPaneScore"></section>
+    </section>
+
+    <section class="card pro-chart-card" id="proChartCard" hidden>
+      <h2>Graphique des flux</h2>
+      <div class="chart-controls">
+        <label><input class="chart-series-toggle" type="checkbox" value="annualNet" checked> Cashflow net annuel</label>
+        <label><input class="chart-series-toggle" type="checkbox" value="cumulativeNet" checked> Cashflow net cumule</label>
+        <label><input class="chart-series-toggle" type="checkbox" value="netSaleValue" checked> Valeur nette revente</label>
+        <label><input class="chart-series-toggle" type="checkbox" value="totalWithExit" checked> Total theorique avec sortie</label>
+      </div>
+      <canvas id="proChart" width="1200" height="460"></canvas>
+      <p id="chartFocus" class="pro-hint">Survole le graphique pour voir le detail par annee.</p>
     </section>
 
     <section class="card legal-card">
