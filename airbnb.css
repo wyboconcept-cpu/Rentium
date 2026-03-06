@@ -153,6 +153,30 @@ input {
 
 .form-grid {
   display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.form-section {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(18, 29, 35, 0.6);
+}
+
+.form-section h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.fiscal-section {
+  border-color: #5c7080;
+  background: rgba(15, 23, 28, 0.9);
+}
+
+.form-grid-inner {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
@@ -456,7 +480,7 @@ th {
   }
 
   .auth-grid,
-  .form-grid,
+  .form-grid-inner,
   .pro-grid,
   .compare-grid,
   .pricing-grid {

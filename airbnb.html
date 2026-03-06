@@ -101,55 +101,66 @@
       <section class="card">
         <h2>Parametres Airbnb</h2>
         <form id="airbnbForm" class="form-grid">
-          <label>Ville de reference (Airbnb)
-            <select id="cityPresetSelect">
-              <option value="none" selected>Aucune (neutre)</option>
-              <option value="paris">Paris</option>
-              <option value="nice">Nice</option>
-              <option value="marseille">Marseille</option>
-              <option value="lyon">Lyon</option>
-              <option value="toulouse">Toulouse</option>
-            </select>
-          </label>
-          <label>
-            <span>Preselection officielle</span>
-            <button id="applyCityPresetBtn" type="button" class="ghost">Pre-remplir la ville</button>
-          </label>
-          <label>Prix du bien<input name="purchasePrice" type="number" min="0" step="1000" value="250000" required></label>
-          <label>Apport<input name="downPayment" type="number" min="0" step="1000" value="40000" required></label>
-          <label>Taux credit (%)<input name="interestRate" type="number" min="0" step="0.01" value="3.7" required></label>
-          <label>Duree credit (ans)<input name="loanYears" type="number" min="1" step="1" value="20" required></label>
-          <label>Assurance annuelle (%)<input name="insuranceRate" type="number" min="0" step="0.01" value="0.34" required></label>
-          <label>Prix nuit moyen (ADR)<input name="nightlyRate" type="number" min="10" step="1" value="115" required></label>
-          <label>Taux occupation (%)<input name="occupancyRate" type="number" min="0" max="100" step="0.1" value="68" required></label>
-          <label>Jours ouverts / an<input name="openDays" type="number" min="1" max="365" step="1" value="330" required></label>
-          <label>Menages / mois<input name="turnoversPerMonth" type="number" min="0" step="1" value="11" required></label>
-          <label>Frais menage facture (EUR)<input name="cleaningFeeCharged" type="number" min="0" step="1" value="45" required></label>
-          <label>Commission plateforme (%)<input name="platformFeeRate" type="number" min="0" max="30" step="0.1" value="3" required></label>
-          <label>Conciergerie (%)<input name="conciergeRate" type="number" min="0" max="40" step="0.1" value="18" required></label>
-          <label>Charges fixes / mois<input name="fixedMonthlyCosts" type="number" min="0" step="10" value="280" required></label>
-          <label>Consommables / menage<input name="suppliesPerTurnover" type="number" min="0" step="1" value="14" required></label>
-          <label>Taxe fonciere / an<input name="propertyTax" type="number" min="0" step="10" value="1600" required></label>
-          <label>Assurance PNO / an<input name="annualInsuranceFixed" type="number" min="0" step="10" value="420" required></label>
-          <label>CFE annuelle<input name="annualCfe" type="number" min="0" step="10" value="650" required></label>
-          <label>Comptable / an<input name="annualAccountingFees" type="number" min="0" step="10" value="900" required></label>
-          <label>Travaux deductibles / an<input name="annualDeductibleWorks" type="number" min="0" step="10" value="1200" required></label>
-          <label>Amortissement bati / an<input name="annualBuildingAmortization" type="number" min="0" step="100" value="5600" required></label>
-          <label>Amortissement mobilier / an<input name="annualFurnitureAmortization" type="number" min="0" step="100" value="1900" required></label>
-          <label>TMI (%)<input name="marginalTaxRate" type="number" min="0" max="45" step="1" value="30" required></label>
-          <label>Prelevements sociaux (%)<input name="socialTaxRate" type="number" min="0" max="30" step="0.1" value="17.2" required></label>
-          <label>Cotisations sociales LMP (%)<input name="lmpSocialRate" type="number" min="0" max="60" step="0.1" value="35" required></label>
-          <label>IS societe (%)<input name="corporateTaxRate" type="number" min="0" max="40" step="0.1" value="25" required></label>
-          <label>Regime fiscal prefere
-            <select name="fiscalMode">
-              <option value="auto" selected>Auto (meilleur net)</option>
-              <option value="lmnp-micro">LMNP Micro-BIC</option>
-              <option value="lmnp-reel">LMNP Reel</option>
-              <option value="lmp-micro">LMP Micro-BIC</option>
-              <option value="lmp-reel">LMP Reel</option>
-              <option value="sci-is">Societe (IS)</option>
-            </select>
-          </label>
+          <section class="form-section" aria-label="Reglages exploitation Airbnb">
+            <h3>Exploitation Airbnb</h3>
+            <div class="form-grid-inner">
+              <label>Ville de reference (Airbnb)
+                <select id="cityPresetSelect">
+                  <option value="none" selected>Aucune (neutre)</option>
+                  <option value="paris">Paris</option>
+                  <option value="nice">Nice</option>
+                  <option value="marseille">Marseille</option>
+                  <option value="lyon">Lyon</option>
+                  <option value="toulouse">Toulouse</option>
+                </select>
+              </label>
+              <label>
+                <span>Preselection officielle</span>
+                <button id="applyCityPresetBtn" type="button" class="ghost">Pre-remplir la ville</button>
+              </label>
+              <label>Prix du bien<input name="purchasePrice" type="number" min="0" step="1000" value="250000" required></label>
+              <label>Apport<input name="downPayment" type="number" min="0" step="1000" value="40000" required></label>
+              <label>Taux credit (%)<input name="interestRate" type="number" min="0" step="0.01" value="3.7" required></label>
+              <label>Duree credit (ans)<input name="loanYears" type="number" min="1" step="1" value="20" required></label>
+              <label>Assurance annuelle (%)<input name="insuranceRate" type="number" min="0" step="0.01" value="0.34" required></label>
+              <label>Prix nuit moyen (ADR)<input name="nightlyRate" type="number" min="10" step="1" value="115" required></label>
+              <label>Taux occupation (%)<input name="occupancyRate" type="number" min="0" max="100" step="0.1" value="68" required></label>
+              <label>Jours ouverts / an<input name="openDays" type="number" min="1" max="365" step="1" value="330" required></label>
+              <label>Menages / mois<input name="turnoversPerMonth" type="number" min="0" step="1" value="11" required></label>
+              <label>Frais menage facture (EUR)<input name="cleaningFeeCharged" type="number" min="0" step="1" value="45" required></label>
+              <label>Commission plateforme (%)<input name="platformFeeRate" type="number" min="0" max="30" step="0.1" value="3" required></label>
+              <label>Conciergerie (%)<input name="conciergeRate" type="number" min="0" max="40" step="0.1" value="18" required></label>
+              <label>Charges fixes / mois<input name="fixedMonthlyCosts" type="number" min="0" step="10" value="280" required></label>
+              <label>Consommables / menage<input name="suppliesPerTurnover" type="number" min="0" step="1" value="14" required></label>
+            </div>
+          </section>
+
+          <section class="form-section fiscal-section" aria-label="Reglages fiscalite Airbnb">
+            <h3>Fiscalite Airbnb</h3>
+            <div class="form-grid-inner">
+              <label>Taxe fonciere / an<input name="propertyTax" type="number" min="0" step="10" value="1600" required></label>
+              <label>Assurance PNO / an<input name="annualInsuranceFixed" type="number" min="0" step="10" value="420" required></label>
+              <label>CFE annuelle<input name="annualCfe" type="number" min="0" step="10" value="650" required></label>
+              <label>Comptable / an<input name="annualAccountingFees" type="number" min="0" step="10" value="900" required></label>
+              <label>Travaux deductibles / an<input name="annualDeductibleWorks" type="number" min="0" step="10" value="1200" required></label>
+              <label>Amortissement bati / an<input name="annualBuildingAmortization" type="number" min="0" step="100" value="5600" required></label>
+              <label>Amortissement mobilier / an<input name="annualFurnitureAmortization" type="number" min="0" step="100" value="1900" required></label>
+              <label>TMI (%)<input name="marginalTaxRate" type="number" min="0" max="45" step="1" value="30" required></label>
+              <label>Prelevements sociaux (%)<input name="socialTaxRate" type="number" min="0" max="30" step="0.1" value="17.2" required></label>
+              <label>Cotisations sociales LMP (%)<input name="lmpSocialRate" type="number" min="0" max="60" step="0.1" value="35" required></label>
+              <label>IS societe (%)<input name="corporateTaxRate" type="number" min="0" max="40" step="0.1" value="25" required></label>
+              <label>Regime fiscal prefere
+                <select name="fiscalMode">
+                  <option value="auto" selected>Auto (meilleur net)</option>
+                  <option value="lmnp-micro">LMNP Micro-BIC</option>
+                  <option value="lmnp-reel">LMNP Reel</option>
+                  <option value="lmp-micro">LMP Micro-BIC</option>
+                  <option value="lmp-reel">LMP Reel</option>
+                  <option value="sci-is">Societe (IS)</option>
+                </select>
+              </label>
+            </div>
+          </section>
         </form>
         <p id="cityDataInfo" class="note"></p>
         <section class="pro-area" id="scenariosArea">
