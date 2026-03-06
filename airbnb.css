@@ -171,6 +171,8 @@ label {
 
 .result-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
   margin-bottom: 10px;
 }
@@ -261,6 +263,38 @@ label {
   margin: 0;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.scenario-list {
+  display: grid;
+  gap: 8px;
+}
+
+.scenario-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #132027;
+}
+
+.scenario-row h4 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.scenario-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.scenario-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .pro-grid {

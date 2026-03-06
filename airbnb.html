@@ -99,6 +99,7 @@
       <section class="card">
         <h2>Resultats</h2>
         <div class="result-actions">
+          <button id="saveScenarioBtn" type="button" class="ghost">Sauvegarder scenario</button>
           <button id="exportPdfBtn" type="button">Exporter PDF</button>
         </div>
         <div id="lockNotice" class="lock-box"></div>
@@ -143,6 +144,10 @@
           <h3>Graphique des flux</h3>
           <canvas id="airbnbChart" width="880" height="300"></canvas>
           <p id="chartFocus" class="note">Projection annuelle: net apres impot et cumul.</p>
+        </section>
+        <section class="pro-area" id="scenariosArea">
+          <h3>Scenarios Airbnb sauvegardes</h3>
+          <div id="scenariosList" class="scenario-list"></div>
         </section>
       </section>
     </div>

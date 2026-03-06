@@ -22,6 +22,8 @@ const chartArea = document.getElementById('chartArea');
 const airbnbChart = document.getElementById('airbnbChart');
 const chartFocus = document.getElementById('chartFocus');
 const exportPdfBtn = document.getElementById('exportPdfBtn');
+const saveScenarioBtn = document.getElementById('saveScenarioBtn');
+const scenariosList = document.getElementById('scenariosList');
 const cityPresetSelect = document.getElementById('cityPresetSelect');
 const applyCityPresetBtn = document.getElementById('applyCityPresetBtn');
 const cityDataInfo = document.getElementById('cityDataInfo');
@@ -41,6 +43,8 @@ let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
 let currentUser = null;
 let currentPlan = 'free';
 let lastReport = null;
+const AIRBNB_SCENARIOS_KEY = 'rentium_airbnb_scenarios_v1';
+let airbnbScenarios = readSavedAirbnbScenarios();
 
 const CITY_OFFICIAL_PRESETS = {
   paris: {
@@ -90,14 +94,17 @@ function init() {
   loginBtn.addEventListener('click', loginAccount);
   logoutBtn.addEventListener('click', logoutAccount);
   if (exportPdfBtn) exportPdfBtn.addEventListener('click', exportPdfReport);
+  if (saveScenarioBtn) saveScenarioBtn.addEventListener('click', saveScenario);
   if (openPricingBtn) openPricingBtn.addEventListener('click', openPricingModal);
   if (closePricingBtn) closePricingBtn.addEventListener('click', closePricingModal);
   if (pricingModal) pricingModal.addEventListener('click', onPricingModalClick);
   document.addEventListener('click', onPlanSelectClick);
+  if (scenariosList) scenariosList.addEventListener('click', onScenariosClick);
   if (cityPresetSelect) cityPresetSelect.addEventListener('change', onCityPresetChange);
   if (applyCityPresetBtn) applyCityPresetBtn.addEventListener('click', onCityPresetApplyClick);
   syncAuthState().finally(render);
   applyInitialCityPreset();
+  renderScenarios();
 }
 
 function readInputs() {
@@ -339,6 +346,7 @@ function render() {
   const hasEssential = currentPlan === 'essential' || currentPlan === 'pro';
   const hasPro = currentPlan === 'pro';
   if (exportPdfBtn) exportPdfBtn.disabled = !hasEssential;
+  if (saveScenarioBtn) saveScenarioBtn.disabled = !hasEssential;
 
   planState.textContent = `Plan actif: ${labelPlan(currentPlan)}`;
   lockNotice.textContent = hasEssential
@@ -358,6 +366,7 @@ function render() {
   if (!hasEssential) {
     renderMetric('Acces', 'Plan payant requis');
     if (chartFocus) chartFocus.textContent = 'Graphique disponible a partir du plan Essentiel.';
+    renderScenarios();
     return;
   }
 
@@ -443,6 +452,7 @@ function render() {
     projection,
     controls
   };
+  renderScenarios();
 }
 
 function renderChart(rows) {
@@ -548,6 +558,110 @@ ${rows.map((row) => `<tr><td>${row.year}</td><td>${formatCurrency(row.grossReven
   win.document.close();
   win.focus();
   win.print();
+}
+
+function saveScenario() {
+  const hasEssential = currentPlan === 'essential' || currentPlan === 'pro';
+  if (!hasEssential) return;
+  const data = readInputs();
+  const controls = readProControls();
+  const evalData = evaluateScenario(data, controls);
+  const name = window.prompt('Nom du scenario Airbnb :', `Scenario ${airbnbScenarios.length + 1}`);
+  if (!name) return;
+
+  const scenario = {
+    id: cryptoRandomId(),
+    name: String(name).trim().slice(0, 100) || `Scenario ${airbnbScenarios.length + 1}`,
+    createdAt: new Date().toISOString(),
+    inputs: data,
+    controls,
+    previewMonthlyAfterTax: evalData.monthlyAfterTax
+  };
+  airbnbScenarios.unshift(scenario);
+  airbnbScenarios = airbnbScenarios.slice(0, 100);
+  persistAirbnbScenarios();
+  renderScenarios();
+}
+
+function onScenariosClick(event) {
+  if (!(event.target instanceof Element)) return;
+  const loadBtn = event.target.closest('[data-load-scenario]');
+  if (loadBtn) {
+    loadScenario(String(loadBtn.getAttribute('data-load-scenario') || ''));
+    return;
+  }
+  const delBtn = event.target.closest('[data-delete-scenario]');
+  if (delBtn) {
+    deleteScenario(String(delBtn.getAttribute('data-delete-scenario') || ''));
+  }
+}
+
+function loadScenario(id) {
+  const scenario = airbnbScenarios.find((s) => s.id === id);
+  if (!scenario || !form) return;
+  Object.entries(scenario.inputs || {}).forEach(([key, value]) => {
+    const el = form.elements.namedItem(key);
+    if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+      el.value = String(value);
+    }
+  });
+  if (dynamicPricingUplift) dynamicPricingUplift.value = String((scenario.controls?.uplift ?? 0) * 100);
+  if (seasonalityIndex) seasonalityIndex.value = String(scenario.controls?.seasonality ?? seasonalityIndex.value);
+  if (cityTaxRate) cityTaxRate.value = String((scenario.controls?.cityTax ?? 0) * 100);
+  if (projectionYears) projectionYears.value = String(scenario.controls?.years ?? projectionYears.value);
+  if (annualRevenueGrowth) annualRevenueGrowth.value = String((scenario.controls?.revenueGrowth ?? 0) * 100);
+  if (annualCostGrowth) annualCostGrowth.value = String((scenario.controls?.costGrowth ?? 0) * 100);
+  render();
+}
+
+function deleteScenario(id) {
+  airbnbScenarios = airbnbScenarios.filter((s) => s.id !== id);
+  persistAirbnbScenarios();
+  renderScenarios();
+}
+
+function renderScenarios() {
+  if (!scenariosList) return;
+  if (!airbnbScenarios.length) {
+    scenariosList.innerHTML = '<p class="note">Aucun scenario Airbnb sauvegarde.</p>';
+    return;
+  }
+
+  scenariosList.innerHTML = airbnbScenarios.map((scenario) => `
+    <article class="scenario-row">
+      <div>
+        <h4>${escapeHtml(scenario.name)}</h4>
+        <p>Cashflow net apercu: <strong>${escapeHtml(formatCurrency(scenario.previewMonthlyAfterTax || 0))} / mois</strong> | ${new Date(scenario.createdAt).toLocaleString('fr-FR')}</p>
+      </div>
+      <div class="scenario-actions">
+        <button type="button" class="ghost" data-load-scenario="${escapeHtml(scenario.id)}">Charger</button>
+        <button type="button" class="ghost" data-delete-scenario="${escapeHtml(scenario.id)}">Supprimer</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+function readSavedAirbnbScenarios() {
+  try {
+    const raw = localStorage.getItem(AIRBNB_SCENARIOS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistAirbnbScenarios() {
+  try {
+    localStorage.setItem(AIRBNB_SCENARIOS_KEY, JSON.stringify(airbnbScenarios));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function cryptoRandomId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `scn_${Date.now()}_${Math.round(Math.random() * 1e8)}`;
 }
 
 function evaluateScenario(data, controls) {
