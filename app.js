@@ -281,18 +281,30 @@ function renderMetrics(results) {
   metricsContainer.innerHTML = '';
   metricConfig.forEach(([key, label]) => {
     const node = metricTemplate.content.cloneNode(true);
+    const card = node.querySelector('.metric');
     node.querySelector('h3').textContent = label;
     node.querySelector('p').textContent = key.includes('Yield') ? formatPercent(results[key]) : formatCurrency(results[key]);
+    if (key === 'monthlyCashflow' && card) {
+      card.classList.add(cashflowToneClass(results[key], 'metric'));
+    }
     metricsContainer.appendChild(node);
   });
 }
 
 function renderCashflow(value, afterTax = false) {
-  const positive = value >= 0;
-  cashflowBanner.classList.toggle('positive', positive);
-  cashflowBanner.classList.toggle('negative', !positive);
+  cashflowBanner.classList.remove('positive', 'negative', 'cashflow-tone-red', 'cashflow-tone-orange', 'cashflow-tone-yellow', 'cashflow-tone-green');
+  cashflowBanner.classList.add(cashflowToneClass(value, 'banner'));
   const suffix = afterTax ? ' apres impot' : '';
-  cashflowBanner.textContent = `${positive ? 'Cashflow positif' : 'Cashflow negatif'}${suffix}: ${formatCurrency(value)} / mois`;
+  cashflowBanner.textContent = `${value >= 0 ? 'Cashflow positif' : 'Cashflow negatif'}${suffix}: ${formatCurrency(value)} / mois`;
+}
+
+function cashflowToneClass(value, target = 'banner') {
+  const v = Number(value || 0);
+  const prefix = target === 'metric' ? 'metric-tone-' : 'cashflow-tone-';
+  if (v < 0) return `${prefix}red`;
+  if (v < 200) return `${prefix}orange`;
+  if (v < 500) return `${prefix}yellow`;
+  return `${prefix}green`;
 }
 
 function computeUncertaintyRange(data, meta = { unknownFields: [] }) {

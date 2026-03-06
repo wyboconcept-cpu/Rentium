@@ -366,6 +366,30 @@ button:disabled {
   font-weight: 600;
 }
 
+.metric.metric-tone-red {
+  border-color: rgba(216, 106, 106, 0.45);
+  background: linear-gradient(180deg, rgba(216, 106, 106, 0.14), #17140f);
+  color: #ffb0b0;
+}
+
+.metric.metric-tone-orange {
+  border-color: rgba(240, 155, 99, 0.5);
+  background: linear-gradient(180deg, rgba(240, 155, 99, 0.16), #17140f);
+  color: #ffd0a8;
+}
+
+.metric.metric-tone-yellow {
+  border-color: rgba(225, 193, 94, 0.52);
+  background: linear-gradient(180deg, rgba(225, 193, 94, 0.16), #17140f);
+  color: #ffe3a2;
+}
+
+.metric.metric-tone-green {
+  border-color: rgba(123, 207, 154, 0.5);
+  background: linear-gradient(180deg, rgba(123, 207, 154, 0.14), #17140f);
+  color: #b7efca;
+}
+
 .cashflow-banner {
   margin-top: 12px;
   border-radius: 12px;
@@ -374,16 +398,30 @@ button:disabled {
   border: 1px solid;
 }
 
-.cashflow-banner.positive {
+.cashflow-banner.positive,
+.cashflow-banner.cashflow-tone-green {
   background: rgba(123, 207, 154, 0.12);
   border-color: rgba(123, 207, 154, 0.35);
   color: var(--success);
 }
 
-.cashflow-banner.negative {
+.cashflow-banner.negative,
+.cashflow-banner.cashflow-tone-red {
   background: rgba(216, 106, 106, 0.14);
   border-color: rgba(216, 106, 106, 0.4);
   color: var(--danger);
+}
+
+.cashflow-banner.cashflow-tone-orange {
+  background: rgba(240, 155, 99, 0.16);
+  border-color: rgba(240, 155, 99, 0.42);
+  color: #f8c17a;
+}
+
+.cashflow-banner.cashflow-tone-yellow {
+  background: rgba(225, 193, 94, 0.16);
+  border-color: rgba(225, 193, 94, 0.42);
+  color: #ecd48f;
 }
 
 .error-box {
