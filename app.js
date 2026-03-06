@@ -925,7 +925,7 @@ function renderProChart(rows) {
 function resizeChartCanvas() {
   const rect = proChart.getBoundingClientRect();
   const cssWidth = Math.max(320, Math.round(rect.width || 960));
-  const cssHeight = Math.max(Number(proChart.dataset.chartHeight || 460), 320);
+  const cssHeight = Math.max(Number(proChart.dataset.chartHeight || 380), 300);
   const dpr = window.devicePixelRatio || 1;
 
   proChart.width = Math.round(cssWidth * dpr);
