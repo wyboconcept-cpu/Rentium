@@ -297,6 +297,31 @@ label {
   gap: 8px;
 }
 
+.legal-card-airbnb {
+  margin-top: 14px;
+}
+
+.legal-details-airbnb {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #121d23;
+  padding: 10px;
+}
+
+.legal-details-airbnb summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.legal-list-airbnb {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .pro-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
