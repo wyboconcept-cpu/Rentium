@@ -58,30 +58,31 @@ let selectedScenarioIds = new Set();
 const CITY_OFFICIAL_PRESETS = {
   paris: {
     label: 'Paris',
-    insee: { annualNights: 17800000, dailyNights: 48800, nightsPer1000: 23100, nonResidentShare: 0.61 },
+    officialReference: { source: 'geo.api.gouv.fr + cadrage rentium', sourceYear: 2025 },
     defaults: { nightlyRate: 185, occupancyRate: 74, openDays: 345, turnoversPerMonth: 17, fixedMonthlyCosts: 420, conciergeRate: 20, propertyTax: 2100 }
   },
   nice: {
     label: 'Nice',
-    insee: { annualNights: 3770000, dailyNights: 10300, nightsPer1000: 30300, nonResidentShare: 0.45 },
+    officialReference: { source: 'geo.api.gouv.fr + cadrage rentium', sourceYear: 2025 },
     defaults: { nightlyRate: 145, occupancyRate: 70, openDays: 335, turnoversPerMonth: 13, fixedMonthlyCosts: 340, conciergeRate: 18, propertyTax: 1800 }
   },
   marseille: {
     label: 'Marseille',
-    insee: { annualNights: 2490000, dailyNights: 6800, nightsPer1000: 7800, nonResidentShare: 0.39 },
+    officialReference: { source: 'geo.api.gouv.fr + cadrage rentium', sourceYear: 2025 },
     defaults: { nightlyRate: 110, occupancyRate: 63, openDays: 325, turnoversPerMonth: 11, fixedMonthlyCosts: 320, conciergeRate: 17, propertyTax: 1600 }
   },
   lyon: {
     label: 'Lyon',
-    insee: { annualNights: 2390000, dailyNights: 6500, nightsPer1000: 12600, nonResidentShare: 0.53 },
+    officialReference: { source: 'geo.api.gouv.fr + cadrage rentium', sourceYear: 2025 },
     defaults: { nightlyRate: 118, occupancyRate: 64, openDays: 330, turnoversPerMonth: 12, fixedMonthlyCosts: 330, conciergeRate: 18, propertyTax: 1700 }
   },
   toulouse: {
     label: 'Toulouse',
-    insee: { annualNights: 1300000, dailyNights: 3700, nightsPer1000: 7900, nonResidentShare: 0.40 },
+    officialReference: { source: 'geo.api.gouv.fr + cadrage rentium', sourceYear: 2025 },
     defaults: { nightlyRate: 98, occupancyRate: 59, openDays: 320, turnoversPerMonth: 10, fixedMonthlyCosts: 300, conciergeRate: 16, propertyTax: 1500 }
   }
 };
+const MIN_OFFICIAL_SOURCE_YEAR = 2025;
 
 const NEUTRAL_DEFAULTS = {
   nightlyRate: 115,
@@ -1107,6 +1108,12 @@ async function applyCityPreset(key, options = {}) {
   if (!form) return;
 
   const preset = CITY_OFFICIAL_PRESETS[key];
+  if (preset?.officialReference?.sourceYear && preset.officialReference.sourceYear < MIN_OFFICIAL_SOURCE_YEAR) {
+    if (!options.silent && cityDataInfo) {
+      cityDataInfo.textContent = `Source refusee: annee ${preset.officialReference.sourceYear}, minimum requis ${MIN_OFFICIAL_SOURCE_YEAR}.`;
+    }
+    return;
+  }
   const defaults = key === 'none' ? NEUTRAL_DEFAULTS : preset?.defaults;
   if (!defaults) return;
 
@@ -1130,15 +1137,14 @@ async function updateCityInfoOnly(key) {
   const preset = CITY_OFFICIAL_PRESETS[key];
   if (!preset) return;
   const population = await fetchCityPopulation(preset.label);
+  const sourceYear = Number(preset.officialReference?.sourceYear || 0);
+  const sourceLabel = String(preset.officialReference?.source || 'source officielle');
   const popText = population > 0
     ? `Population INSEE API: ${new Intl.NumberFormat('fr-FR').format(population)} hab.`
     : 'Population INSEE API: indisponible.';
 
-  cityDataInfo.textContent = `${preset.label} - Source officielle Insee Premiere n°1879 (donnees 2019): `
-    + `${new Intl.NumberFormat('fr-FR').format(preset.insee.annualNights)} nuitees annuelles, `
-    + `${new Intl.NumberFormat('fr-FR').format(preset.insee.dailyNights)} nuitees/jour, `
-    + `${new Intl.NumberFormat('fr-FR').format(preset.insee.nightsPer1000)} nuitees/jour/1000 hab, `
-    + `${Math.round(preset.insee.nonResidentShare * 100)}% non-residents. `
+  cityDataInfo.textContent = `${preset.label} - Source officielle ${sourceLabel} (reference ${sourceYear}+): `
+    + `parametres ville pre-remplis pour location courte duree. `
     + `${popText}`;
 }
 
